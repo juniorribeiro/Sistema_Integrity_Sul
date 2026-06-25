@@ -19,6 +19,7 @@ import psicologiaRoutes from './modules/psicologia/psicologia.routes.js';
 import nutricaoRoutes from './modules/nutricao/nutricao.routes.js';
 import juridicoRoutes from './modules/juridico/juridico.routes.js';
 import financeiroAtendimentoRoutes from './modules/financeiro-atendimento/financeiro-atendimento.routes.js';
+import agendamentosRoutes from './modules/agendamentos/agendamentos.routes.js';
 
 async function build() {
   const app = Fastify({
@@ -73,6 +74,7 @@ async function build() {
   await app.register(nutricaoRoutes, { prefix: '/nutricao' });
   await app.register(juridicoRoutes, { prefix: '/juridico' });
   await app.register(financeiroAtendimentoRoutes, { prefix: '/financeiro-atendimento' });
+  await app.register(agendamentosRoutes, { prefix: '/agendamentos' });
 
   return app;
 }

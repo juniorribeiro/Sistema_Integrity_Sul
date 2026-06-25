@@ -7,13 +7,12 @@ import { Menu, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/lib/auth-store';
-import { NAV_POR_PORTAL, ROLE_LABEL, type Portal } from '@/lib/nav';
+import { NAV_POR_PORTAL, navIntegrityParaRole, ROLE_LABEL, type Portal, type NavItem } from '@/lib/nav';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 
-function NavLinks({ portal, onNavigate }: { portal: Portal; onNavigate?: () => void }) {
+function NavLinks({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => void }) {
   const pathname = usePathname();
-  const items = NAV_POR_PORTAL[portal];
   return (
     <nav className="flex flex-col gap-1 p-3">
       {items.map((item) => {
@@ -43,6 +42,9 @@ export function AppShell({ portal, children }: { portal: Portal; children: React
   const { usuario, refreshToken, clear } = useAuthStore();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  const navItems =
+    portal === 'integrity' && usuario ? navIntegrityParaRole(usuario.role) : NAV_POR_PORTAL[portal];
+
   async function logout() {
     try {
       if (refreshToken) await api.post('/auth/logout', { refreshToken });
@@ -68,7 +70,7 @@ export function AppShell({ portal, children }: { portal: Portal; children: React
       <aside className="hidden w-64 shrink-0 border-r bg-background lg:flex lg:flex-col">
         {Brand}
         <div className="flex-1 overflow-y-auto">
-          <NavLinks portal={portal} />
+          <NavLinks items={navItems} />
         </div>
         <div className="border-t p-3">
           <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground" onClick={logout}>
@@ -91,7 +93,7 @@ export function AppShell({ portal, children }: { portal: Portal; children: React
             <SheetContent side="left" className="w-72 p-0">
               <SheetTitle className="sr-only">Menu de navegação</SheetTitle>
               {Brand}
-              <NavLinks portal={portal} onNavigate={() => setDrawerOpen(false)} />
+              <NavLinks items={navItems} onNavigate={() => setDrawerOpen(false)} />
               <div className="border-t p-3">
                 <Button variant="ghost" className="w-full justify-start gap-3 text-muted-foreground" onClick={logout}>
                   <LogOut className="h-4 w-4" /> Sair

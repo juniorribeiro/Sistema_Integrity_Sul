@@ -79,10 +79,12 @@ services:
       - "127.0.0.1:3900:3900"   # S3 API (interno — bind apenas em localhost)
       - "127.0.0.1:3903:3903"   # Admin API (interno — bind apenas em localhost)
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3903/health"]
+      # imagem distroless não tem curl; usamos o próprio binário do Garage
+      test: ["CMD", "/garage", "status"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 20s
     networks:
       - integrity_net
 

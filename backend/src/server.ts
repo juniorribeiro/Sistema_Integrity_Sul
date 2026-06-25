@@ -15,6 +15,7 @@ import colaboradoresRoutes from './modules/colaboradores/colaboradores.routes.js
 import empresasRoutes from './modules/empresas/empresas.routes.js';
 import funcionariosRoutes from './modules/funcionarios/funcionarios.routes.js';
 import triagemRoutes from './modules/triagem/triagem.routes.js';
+import psicologiaRoutes from './modules/psicologia/psicologia.routes.js';
 
 async function build() {
   const app = Fastify({
@@ -65,6 +66,7 @@ async function build() {
   await app.register(empresasRoutes, { prefix: '/empresas' });
   await app.register(funcionariosRoutes, { prefix: '/funcionarios' });
   await app.register(triagemRoutes, { prefix: '/triagem' });
+  await app.register(psicologiaRoutes, { prefix: '/psicologia' });
 
   return app;
 }

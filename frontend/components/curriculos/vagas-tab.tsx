@@ -36,9 +36,13 @@ export function VagasTab() {
 
   async function criar(d: Record<string, string>) {
     try {
-      await api.post('/curriculos/vagas', d);
-      toast.success('Vaga criada');
-      setOpen(false); reset(); carregar();
+      const { data } = await api.post('/curriculos/vagas', d);
+      const n = data.candidatosAdicionados ?? 0;
+      toast.success(n > 0 ? `Vaga criada — ${n} candidato(s) compatível(is) adicionados ao pipeline` : 'Vaga criada');
+      setOpen(false);
+      reset();
+      carregar();
+      setSel(data.id); // abre a vaga já com os candidatos compatíveis
     } catch (e) { toast.error(apiErrorMessage(e)); }
   }
 
@@ -53,8 +57,12 @@ export function VagasTab() {
             <DialogHeader><DialogTitle>Nova vaga</DialogTitle></DialogHeader>
             <form onSubmit={handleSubmit(criar)} className="space-y-3">
               <div className="space-y-1.5"><Label htmlFor="titulo">Título</Label><Input id="titulo" {...register('titulo', { required: true })} /></div>
-              <div className="space-y-1.5"><Label htmlFor="area">Área</Label><Input id="area" {...register('area', { required: true })} /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5"><Label htmlFor="area">Área</Label><Input id="area" {...register('area', { required: true })} /></div>
+                <div className="space-y-1.5"><Label htmlFor="localidade">Localidade</Label><Input id="localidade" placeholder="ex.: São Paulo" {...register('localidade')} /></div>
+              </div>
               <div className="space-y-1.5"><Label htmlFor="descricao">Descrição</Label><Input id="descricao" {...register('descricao', { required: true })} /></div>
+              <p className="text-xs text-muted-foreground">Ao criar, candidatos compatíveis (mesma área ou cargo) são adicionados automaticamente ao pipeline.</p>
               <Button type="submit" className="w-full">Criar</Button>
             </form>
           </DialogContent>

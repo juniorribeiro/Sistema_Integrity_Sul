@@ -539,13 +539,14 @@ model AvaliacaoCandidato {
 }
 
 model Vaga {
-  id        String     @id @default(cuid())
-  titulo    String
-  empresaId String?
-  area      String
-  descricao String
-  status    StatusVaga @default(ABERTA)
-  criadoEm  DateTime   @default(now())
+  id         String     @id @default(cuid())
+  titulo     String
+  empresaId  String?
+  area       String
+  localidade String?
+  descricao  String
+  status     StatusVaga @default(ABERTA)
+  criadoEm   DateTime   @default(now())
 
   candidatos VagaCandidato[]
 }

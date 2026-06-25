@@ -14,6 +14,49 @@ import type {
 
 const BUCKET = 'curriculos';
 
+/** Normaliza texto: minúsculas, sem acentos, sem espaços nas pontas. */
+function normalizar(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .trim();
+}
+
+/** Tokens significativos (>= 3 chars) para correspondência parcial. */
+function tokens(s: string): string[] {
+  return normalizar(s)
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 3);
+}
+
+/**
+ * Um candidato "combina" com a vaga se a área for igual OU se houver correspondência
+ * parcial entre o título da vaga e o cargo do candidato (token em comum ou substring).
+ */
+function combina(vaga: { titulo: string; area: string }, cand: { area: string; cargo: string }): boolean {
+  if (normalizar(cand.area) === normalizar(vaga.area)) return true;
+  const tituloTokens = tokens(vaga.titulo);
+  const cargoTokens = tokens(cand.cargo);
+  if (tituloTokens.some((t) => cargoTokens.includes(t))) return true;
+  const nt = normalizar(vaga.titulo);
+  const nc = normalizar(cand.cargo);
+  return nt.length > 0 && nc.length > 0 && (nc.includes(nt) || nt.includes(nc));
+}
+
+/** Comparador que prioriza candidatos na mesma localidade da vaga, depois por localidade. */
+function ordenarPorLocalidade(vagaLocalidade: string | null) {
+  const loc = vagaLocalidade ? normalizar(vagaLocalidade) : null;
+  return (a: string | null, b: string | null): number => {
+    if (loc) {
+      const am = normalizar(a ?? '') === loc ? 0 : 1;
+      const bm = normalizar(b ?? '') === loc ? 0 : 1;
+      if (am !== bm) return am - bm;
+    }
+    return (a ?? '').localeCompare(b ?? '', 'pt-BR');
+  };
+}
+
 export function createCurriculosService(app: FastifyInstance) {
   // ----- Candidatos -----
   async function listarCandidatos(filtros: { area?: string; status?: string; q?: string }) {
@@ -78,7 +121,31 @@ export function createCurriculosService(app: FastifyInstance) {
   }
 
   async function criarVaga(input: CriarVagaInput) {
-    return app.prisma.vaga.create({ data: input });
+    const vaga = await app.prisma.vaga.create({ data: input });
+
+    // Match automático: currículos elegíveis (DISPONIVEL/INATIVO) que combinam com a vaga
+    const elegiveis = await app.prisma.candidato.findMany({
+      where: { status: { in: ['DISPONIVEL', 'INATIVO'] } },
+      select: { id: true, cargo: true, area: true, localidade: true },
+    });
+    const matches = elegiveis.filter((c) => combina(vaga, c));
+
+    // Prioriza por localidade (mesma localidade da vaga primeiro)
+    const cmp = ordenarPorLocalidade(vaga.localidade);
+    matches.sort((a, b) => cmp(a.localidade, b.localidade));
+
+    if (matches.length > 0) {
+      const ids = matches.map((m) => m.id);
+      await app.prisma.$transaction([
+        app.prisma.vagaCandidato.createMany({
+          data: matches.map((m) => ({ vagaId: vaga.id, candidatoId: m.id })),
+          skipDuplicates: true,
+        }),
+        app.prisma.candidato.updateMany({ where: { id: { in: ids } }, data: { status: 'EM_PROCESSO' } }),
+      ]);
+    }
+
+    return { ...vaga, candidatosAdicionados: matches.length };
   }
 
   async function obterVaga(id: string) {
@@ -87,11 +154,14 @@ export function createCurriculosService(app: FastifyInstance) {
       include: {
         candidatos: {
           orderBy: { criadoEm: 'asc' },
-          include: { candidato: { select: { id: true, nome: true, cargo: true, status: true } } },
+          include: { candidato: { select: { id: true, nome: true, cargo: true, status: true, localidade: true } } },
         },
       },
     });
     if (!v) throw new AppError(404, 'Vaga não encontrada');
+    // Prioriza a listagem do pipeline pela localidade da vaga
+    const cmp = ordenarPorLocalidade(v.localidade);
+    v.candidatos.sort((a, b) => cmp(a.candidato.localidade, b.candidato.localidade));
     return v;
   }
 

@@ -35,12 +35,14 @@ export const avaliacaoSchema = z.object({
 export const criarVagaSchema = z.object({
   titulo: z.string().min(2),
   area: z.string().min(2),
+  localidade: z.string().optional(),
   descricao: z.string().min(1),
   empresaId: z.string().optional(),
 });
 
 export const atualizarVagaSchema = z.object({
   status: z.enum(STATUS_VAGA).optional(),
+  localidade: z.string().optional(),
   descricao: z.string().optional(),
 });
 

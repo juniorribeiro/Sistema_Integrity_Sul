@@ -1,0 +1,6 @@
+# Crontab do VPS — adicionar com `crontab -e`
+# Garanta que POSTGRES_USER e POSTGRES_DB estejam exportados ou definidos no topo.
+
+0 2 * * * /scripts/backup_postgres.sh >> /var/log/backup.log 2>&1
+0 3 * * * /scripts/backup_storage.sh  >> /var/log/backup.log 2>&1
+0 4 * * * /scripts/backup_offsite.sh  >> /var/log/backup.log 2>&1

@@ -1,0 +1,602 @@
+// Schema Prisma — Sistema de Gestão Integrity Sul
+// PostgreSQL 16 + pgcrypto (criptografia em repouso de dados sensíveis de triagem)
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgcrypto, citext]
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum Role {
+  DIRETORIA
+  CONSULTOR_RH
+  PSICOLOGO
+  NUTRICIONISTA
+  JURIDICO
+  FINANCEIRO_ATENDIMENTO
+  FINANCEIRO_INTEGRITY
+  RH_CLIENTE
+  FUNCIONARIO
+}
+
+enum Setor {
+  PSICOLOGIA
+  NUTRICAO
+  JURIDICO
+  FINANCEIRO
+}
+
+enum Modalidade {
+  PRESENCIAL
+  ONLINE
+}
+
+enum StatusAgend {
+  AGENDADO
+  CONFIRMADO
+  REALIZADO
+  CANCELADO
+}
+
+enum StatusCand {
+  DISPONIVEL
+  EM_PROCESSO
+  CONTRATADO
+  INATIVO
+}
+
+enum StatusVaga {
+  ABERTA
+  EM_ANDAMENTO
+  FECHADA
+  CANCELADA
+}
+
+enum EtapaPipeline {
+  TRIAGEM
+  ENTREVISTA
+  TESTE
+  PROPOSTA
+  CONTRATADO
+  REPROVADO
+}
+
+enum TipoLanc {
+  RECEITA
+  DESPESA
+}
+
+enum StatusPag {
+  PENDENTE
+  PAGO
+  CANCELADO
+}
+
+// ============================================================
+// USUÁRIOS E AUTENTICAÇÃO
+// ============================================================
+
+model Usuario {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  senhaHash     String
+  role          Role
+  primeiroLogin Boolean  @default(true)
+  ativo         Boolean  @default(true)
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+
+  // Relações polimórficas por role (apenas uma é preenchida)
+  colaborador Colaborador?
+  funcionario Funcionario?
+  rhCliente   RHCliente?
+
+  consentimentos ConsentimentoLGPD[]
+}
+
+// Equipe interna da Integrity Sul
+model Colaborador {
+  id             String   @id @default(cuid())
+  usuarioId      String   @unique
+  nome           String
+  cpf            String   @unique
+  telefone       String?
+  registro       String? // CRP / CRN / OAB / CRC conforme o setor
+  setor          Setor? // setor de atendimento (null para DIRETORIA / CONSULTOR_RH / FINANCEIRO_INTEGRITY)
+  avatarKey      String? // chave no bucket 'avatares'
+  googleCalToken String? // token OAuth Google Calendar (criptografado)
+  criadoEm       DateTime @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  prontuariosPsicologia ProntuarioPsicologia[]
+  prontuariosNutricao   ProntuarioNutricao[]
+  prontuariosJuridico   ProntuarioJuridico[]
+  prontuariosFinanceiro ProntuarioFinanceiro[]
+  agendamentos          Agendamento[]
+}
+
+// RH da empresa cliente
+model RHCliente {
+  id        String   @id @default(cuid())
+  usuarioId String   @unique
+  empresaId String
+  nome      String
+  telefone  String?
+  criadoEm  DateTime @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  empresa Empresa @relation(fields: [empresaId], references: [id])
+}
+
+// ============================================================
+// EMPRESA CLIENTE
+// ============================================================
+
+model Empresa {
+  id               String    @id @default(cuid())
+  razaoSocial      String
+  cnpj             String    @unique
+  setor            String
+  responsavelNome  String
+  responsavelEmail String
+  urlToken         String    @unique // token da URL única de cadastro
+  urlExpiresAt     DateTime?
+  limiteFunc       Int       @default(100)
+  ativa            Boolean   @default(true)
+  criadoEm         DateTime  @default(now())
+
+  pacoteAtivo     PacoteEmpresa?
+  funcionarios    Funcionario[]
+  rhClientes      RHCliente[]
+  servicosAvulsos ServicoAvulso[]
+  metricas        MetricaEmpresa[]
+  lancamentos     LancamentoFinanceiro[]
+}
+
+model PacoteEmpresa {
+  id          String    @id @default(cuid())
+  empresaId   String    @unique
+  nome        String
+  setores     Setor[] // setores contratados
+  valorMensal Float
+  vigenciaIni DateTime
+  vigenciaFim DateTime?
+  ativo       Boolean   @default(true)
+  criadoEm    DateTime  @default(now())
+
+  empresa Empresa @relation(fields: [empresaId], references: [id])
+}
+
+model ServicoAvulso {
+  id        String    @id @default(cuid())
+  empresaId String
+  descricao String
+  setor     Setor
+  valor     Float
+  data      DateTime
+  status    StatusPag @default(PENDENTE)
+  criadoEm  DateTime  @default(now())
+
+  empresa Empresa @relation(fields: [empresaId], references: [id])
+}
+
+model MetricaEmpresa {
+  id           String   @id @default(cuid())
+  empresaId    String
+  setor        Setor
+  competencia  String // 'YYYY-MM'
+  atendimentos Int      @default(0)
+  funcAtivos   Int      @default(0)
+  satisfacao   Float? // média 0-10
+  criadoEm     DateTime @default(now())
+
+  empresa Empresa @relation(fields: [empresaId], references: [id])
+
+  @@unique([empresaId, setor, competencia])
+}
+
+// ============================================================
+// FUNCIONÁRIO DO CLIENTE
+// ============================================================
+
+model Funcionario {
+  id        String   @id @default(cuid())
+  usuarioId String   @unique
+  empresaId String
+  nome      String
+  cpf       String   @unique
+  cargo     String
+  telefone  String
+  avatarKey String?
+  criadoEm  DateTime @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  empresa Empresa @relation(fields: [empresaId], references: [id])
+
+  triagem              Triagem?
+  prontuarioPsicologia ProntuarioPsicologia?
+  prontuarioNutricao   ProntuarioNutricao?
+  prontuarioJuridico   ProntuarioJuridico[]
+  prontuarioFinanceiro ProntuarioFinanceiro?
+  agendamentos         Agendamento[]
+}
+
+// ============================================================
+// TRIAGEM — 4 setores isolados (RLS por setor)
+// ============================================================
+
+model Triagem {
+  id            String   @id @default(cuid())
+  funcionarioId String   @unique
+  concluida     Boolean  @default(false)
+  criadoEm      DateTime @default(now())
+
+  funcionario Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+
+  psicologia TriagemPsicologia?
+  nutricao   TriagemNutricao?
+  juridico   TriagemJuridico?
+  financeiro TriagemFinanceiro?
+}
+
+model TriagemPsicologia {
+  id                     String  @id @default(cuid())
+  triagemId              String  @unique
+  saudeMentalNota        Int // 1-10
+  acompanhamentoAnterior Boolean
+  acompanhamentoDetalhe  String?
+  medicacaoPsiq          Boolean
+  medicacaoDetalhe       String?
+  stressTrabNota         Int // 1-10
+  qualidadeSono          String
+  ansiedadeTristeza      Int // 1-10
+  situacaoAtual          String?
+  contatoEmergNome       String
+  contatoEmergTel        String
+  contatoEmergParent     String
+
+  triagem Triagem @relation(fields: [triagemId], references: [id], onDelete: Cascade)
+}
+
+model TriagemNutricao {
+  id                 String   @id @default(cuid())
+  triagemId          String   @unique
+  pesoKg             Float
+  alturaCm           Float
+  restricoes         String[]
+  condicoesSaude     String[]
+  habitosAlimentares String
+  objetivo           String
+  atividadeFisica    String
+  refeicoesDia       Int
+  consumoAgua        String
+
+  triagem Triagem @relation(fields: [triagemId], references: [id], onDelete: Cascade)
+}
+
+model TriagemJuridico {
+  id                String   @id @default(cuid())
+  triagemId         String   @unique
+  temDemanda        Boolean
+  areaDir           String?
+  urgencia          String?
+  processoAndamento Boolean?
+  processoFase      String?
+  outraParte        String?
+  temDocumentacao   Boolean?
+  descricao         String?
+
+  triagem Triagem @relation(fields: [triagemId], references: [id], onDelete: Cascade)
+}
+
+model TriagemFinanceiro {
+  id              String @id @default(cuid())
+  triagemId       String @unique
+  faixaRenda      String
+  situacaoDividas String
+  objetivoPrinc   String
+  investeAtual    String
+  controlGastos   String
+  previdencia     String
+  dependentes     String
+
+  triagem Triagem @relation(fields: [triagemId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================
+// PRONTUÁRIOS POR SETOR
+// ============================================================
+
+model ProntuarioPsicologia {
+  id               String   @id @default(cuid())
+  funcionarioId    String   @unique
+  profissionalId   String
+  planoTerapeutico String?
+  criadoEm         DateTime @default(now())
+  atualizadoEm     DateTime @updatedAt
+
+  funcionario  Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+  profissional Colaborador @relation(fields: [profissionalId], references: [id])
+
+  sessoes    SessaoPsicologia[]
+  metas      MetaPsicologia[]
+  documentos DocumentoStorage[]
+}
+
+model SessaoPsicologia {
+  id           String    @id @default(cuid())
+  prontuarioId String
+  data         DateTime
+  evolucao     String // anotação clínica (sensível)
+  proximaData  DateTime?
+  criadoEm     DateTime  @default(now())
+
+  prontuario ProntuarioPsicologia @relation(fields: [prontuarioId], references: [id], onDelete: Cascade)
+}
+
+model MetaPsicologia {
+  id           String    @id @default(cuid())
+  prontuarioId String
+  descricao    String
+  atingida     Boolean   @default(false)
+  prazo        DateTime?
+  criadoEm     DateTime  @default(now())
+
+  prontuario ProntuarioPsicologia @relation(fields: [prontuarioId], references: [id], onDelete: Cascade)
+}
+
+model ProntuarioNutricao {
+  id             String   @id @default(cuid())
+  funcionarioId  String   @unique
+  profissionalId String
+  planoAlimentar String?
+  criadoEm       DateTime @default(now())
+  atualizadoEm   DateTime @updatedAt
+
+  funcionario  Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+  profissional Colaborador @relation(fields: [profissionalId], references: [id])
+
+  consultas  ConsultaNutricao[]
+  evolucoes  EvolucaoNutricao[]
+  documentos DocumentoStorage[]
+}
+
+model ConsultaNutricao {
+  id           String    @id @default(cuid())
+  prontuarioId String
+  data         DateTime
+  anotacoes    String
+  proximaData  DateTime?
+  criadoEm     DateTime  @default(now())
+
+  prontuario ProntuarioNutricao @relation(fields: [prontuarioId], references: [id], onDelete: Cascade)
+}
+
+model EvolucaoNutricao {
+  id           String   @id @default(cuid())
+  prontuarioId String
+  data         DateTime
+  pesoKg       Float
+  imc          Float?
+  observacoes  String?
+  criadoEm     DateTime @default(now())
+
+  prontuario ProntuarioNutricao @relation(fields: [prontuarioId], references: [id], onDelete: Cascade)
+}
+
+// Jurídico: um prontuário por caso (Funcionario pode ter vários)
+model ProntuarioJuridico {
+  id             String   @id @default(cuid())
+  funcionarioId  String
+  profissionalId String
+  areaDir        String
+  titulo         String
+  descricao      String?
+  numeroProcesso String?
+  fase           String?
+  status         String   @default("ABERTO")
+  criadoEm       DateTime @default(now())
+  atualizadoEm   DateTime @updatedAt
+
+  funcionario  Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+  profissional Colaborador @relation(fields: [profissionalId], references: [id])
+
+  prazos     PrazoJuridico[]
+  documentos DocumentoStorage[]
+}
+
+model PrazoJuridico {
+  id           String   @id @default(cuid())
+  prontuarioId String
+  descricao    String
+  data         DateTime
+  cumprido     Boolean  @default(false)
+  criadoEm     DateTime @default(now())
+
+  prontuario ProntuarioJuridico @relation(fields: [prontuarioId], references: [id], onDelete: Cascade)
+}
+
+model ProntuarioFinanceiro {
+  id             String   @id @default(cuid())
+  funcionarioId  String   @unique
+  profissionalId String
+  planoAcao      String?
+  criadoEm       DateTime @default(now())
+  atualizadoEm   DateTime @updatedAt
+
+  funcionario  Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+  profissional Colaborador @relation(fields: [profissionalId], references: [id])
+
+  consultas  ConsultaFinanceira[]
+  documentos DocumentoStorage[]
+}
+
+model ConsultaFinanceira {
+  id           String    @id @default(cuid())
+  prontuarioId String
+  data         DateTime
+  anotacoes    String
+  proximaData  DateTime?
+  criadoEm     DateTime  @default(now())
+
+  prontuario ProntuarioFinanceiro @relation(fields: [prontuarioId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================
+// DOCUMENTOS (metadados de arquivos no Garage)
+// ============================================================
+
+model DocumentoStorage {
+  id        String   @id @default(cuid())
+  bucket    String
+  objectKey String // chave do objeto no bucket
+  nomeArq   String
+  mimeType  String
+  tamanho   Int
+  setor     Setor
+  criadoEm  DateTime @default(now())
+
+  // Relações opcionais por prontuário (apenas uma é preenchida)
+  prontuarioPsicologiaId String?
+  prontuarioNutricaoId   String?
+  prontuarioJuridicoId   String?
+  prontuarioFinanceiroId String?
+
+  prontuarioPsicologia ProntuarioPsicologia? @relation(fields: [prontuarioPsicologiaId], references: [id], onDelete: Cascade)
+  prontuarioNutricao   ProntuarioNutricao?   @relation(fields: [prontuarioNutricaoId], references: [id], onDelete: Cascade)
+  prontuarioJuridico   ProntuarioJuridico?   @relation(fields: [prontuarioJuridicoId], references: [id], onDelete: Cascade)
+  prontuarioFinanceiro ProntuarioFinanceiro? @relation(fields: [prontuarioFinanceiroId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================
+// AGENDAMENTOS (compartilhado pelos 4 setores)
+// ============================================================
+
+model Agendamento {
+  id             String      @id @default(cuid())
+  funcionarioId  String
+  profissionalId String
+  setor          Setor
+  dataHora       DateTime
+  modalidade     Modalidade
+  status         StatusAgend @default(AGENDADO)
+  linkOnline     String?
+  observacoes    String?
+  googleCalId    String?
+  criadoPor      String // ID de quem criou
+  criadoEm       DateTime    @default(now())
+
+  funcionario  Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+  profissional Colaborador @relation(fields: [profissionalId], references: [id])
+
+  @@index([profissionalId, dataHora])
+  @@index([funcionarioId])
+}
+
+// ============================================================
+// BANCO DE CURRÍCULOS
+// ============================================================
+
+model Candidato {
+  id              String     @id @default(cuid())
+  nome            String
+  email           String     @unique
+  cpf             String     @unique
+  telefone        String
+  cargo           String
+  area            String
+  nivelExp        String
+  localidade      String
+  pretensao       Float?
+  disponibilidade String
+  curriculoKey    String? // chave no bucket 'curriculos'
+  status          StatusCand @default(DISPONIVEL)
+  criadoEm        DateTime   @default(now())
+
+  avaliacoes AvaliacaoCandidato[]
+  vagas      VagaCandidato[]
+}
+
+model AvaliacaoCandidato {
+  id          String   @id @default(cuid())
+  candidatoId String
+  autorId     String // Colaborador (sem FK forte para simplificar)
+  nota        Int // 1-5
+  comentario  String?
+  criadoEm    DateTime @default(now())
+
+  candidato Candidato @relation(fields: [candidatoId], references: [id], onDelete: Cascade)
+}
+
+model Vaga {
+  id        String     @id @default(cuid())
+  titulo    String
+  empresaId String?
+  area      String
+  descricao String
+  status    StatusVaga @default(ABERTA)
+  criadoEm  DateTime   @default(now())
+
+  candidatos VagaCandidato[]
+}
+
+model VagaCandidato {
+  id          String        @id @default(cuid())
+  vagaId      String
+  candidatoId String
+  etapa       EtapaPipeline @default(TRIAGEM)
+  observacoes String?
+  criadoEm    DateTime      @default(now())
+
+  vaga      Vaga      @relation(fields: [vagaId], references: [id], onDelete: Cascade)
+  candidato Candidato @relation(fields: [candidatoId], references: [id], onDelete: Cascade)
+
+  @@unique([vagaId, candidatoId])
+}
+
+// ============================================================
+// GESTÃO FINANCEIRA DA INTEGRITY SUL
+// ============================================================
+
+model LancamentoFinanceiro {
+  id        String    @id @default(cuid())
+  tipo      TipoLanc
+  categoria String
+  descricao String
+  valor     Float
+  data      DateTime
+  empresaId String?
+  status    StatusPag @default(PENDENTE)
+  nfNumero  String?
+  criadoEm  DateTime  @default(now())
+
+  empresa Empresa? @relation(fields: [empresaId], references: [id])
+
+  @@index([data])
+  @@index([tipo, status])
+}
+
+// ============================================================
+// LGPD
+// ============================================================
+
+model ConsentimentoLGPD {
+  id        String   @id @default(cuid())
+  usuarioId String
+  versao    String // versão dos termos aceitos
+  ip        String?
+  userAgent String?
+  aceitoEm  DateTime @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+}

@@ -1,0 +1,22 @@
+# Override de DESENVOLVIMENTO (mesclado automaticamente pelo docker compose).
+# Publica portas no host para que frontend/backend rodem localmente (npm run dev)
+# contra a infra containerizada. NÃO usar em produção.
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  redis:
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  # Em dev local não subimos frontend/backend/nginx em container.
+  frontend:
+    profiles: ["full"]
+  backend:
+    profiles: ["full"]
+  nginx:
+    profiles: ["full"]
+  garage-webui:
+    ports:
+      - "127.0.0.1:3909:3909"

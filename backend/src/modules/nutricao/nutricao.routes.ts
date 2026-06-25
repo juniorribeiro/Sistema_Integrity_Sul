@@ -59,6 +59,19 @@ export default async function nutricaoRoutes(app: FastifyInstance) {
     return service.urlDownloadDocumento(docId, req.user.sub, req.user.role);
   });
 
+  app.delete('/consultas/:id', { preHandler: app.authorize([...PROF]) }, async (req) =>
+    service.removerConsulta((req.params as { id: string }).id, req.user.sub, req.user.role),
+  );
+  app.delete('/evolucoes/:id', { preHandler: app.authorize([...PROF]) }, async (req) =>
+    service.removerEvolucao((req.params as { id: string }).id, req.user.sub, req.user.role),
+  );
+  app.delete('/documentos/:id', { preHandler: app.authorize([...PROF]) }, async (req) =>
+    service.removerDocumento((req.params as { id: string }).id, req.user.sub, req.user.role),
+  );
+  app.delete('/prontuarios/:id', { preHandler: app.authorize([...PROF]) }, async (req) =>
+    service.removerProntuario((req.params as { id: string }).id, req.user.sub, req.user.role),
+  );
+
   app.get('/meu-prontuario', { preHandler: app.authorize(['FUNCIONARIO']) }, async (req) =>
     service.meuProntuario(req.user.sub),
   );

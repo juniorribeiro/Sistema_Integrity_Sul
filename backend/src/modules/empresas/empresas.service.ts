@@ -99,6 +99,34 @@ export function createEmpresasService(app: FastifyInstance) {
     return app.prisma.empresa.update({ where: { id }, data: input });
   }
 
+  /** Remove a empresa e tudo vinculado: usuários de funcionários e RH (cascata) e lançamentos desvinculados. */
+  async function remover(id: string) {
+    const emp = await app.prisma.empresa.findUnique({
+      where: { id },
+      include: {
+        funcionarios: { select: { usuarioId: true } },
+        rhClientes: { select: { usuarioId: true } },
+      },
+    });
+    if (!emp) throw new AppError(404, 'Empresa não encontrada');
+
+    const usuarioIds = [
+      ...emp.funcionarios.map((f) => f.usuarioId),
+      ...emp.rhClientes.map((r) => r.usuarioId),
+    ];
+
+    await app.prisma.$transaction([
+      // desvincula lançamentos financeiros (empresaId é opcional)
+      app.prisma.lancamentoFinanceiro.updateMany({ where: { empresaId: id }, data: { empresaId: null } }),
+      // apagar os usuários cascateia funcionários/RH e seus dados
+      app.prisma.usuario.deleteMany({ where: { id: { in: usuarioIds } } }),
+      app.prisma.empresa.delete({ where: { id } }),
+    ]);
+
+    await app.redis.del(`${CADASTRO_PREFIX}${emp.urlToken}`);
+    return { ok: true };
+  }
+
   async function regenerarUrl(id: string, validadeDias = 30) {
     const emp = await app.prisma.empresa.findUnique({ where: { id } });
     if (!emp) throw new AppError(404, 'Empresa não encontrada');
@@ -141,5 +169,5 @@ export function createEmpresasService(app: FastifyInstance) {
     };
   }
 
-  return { criar, listar, obter, atualizar, regenerarUrl, validarToken };
+  return { criar, listar, obter, atualizar, remover, regenerarUrl, validarToken };
 }

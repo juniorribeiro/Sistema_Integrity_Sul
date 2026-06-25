@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { Plus, ArrowLeft, Upload, Download, Star, FileText } from 'lucide-react';
+import { Plus, ArrowLeft, Upload, Download, Star, FileText, Trash2, Pencil } from 'lucide-react';
+import { ConfirmDelete } from '@/components/shared/confirm-delete';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { api, apiErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -140,7 +142,28 @@ interface Detalhe extends Candidato {
 function CandidatoDetail({ id, onVoltar }: { id: string; onVoltar: () => void }) {
   const [c, setC] = useState<Detalhe | null>(null);
   const [aval, setAval] = useState({ nota: '5', comentario: '' });
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState({ cargo: '', area: '', nivelExp: '', localidade: '', pretensao: '', disponibilidade: '', status: 'DISPONIVEL' });
   const fileRef = useRef<HTMLInputElement>(null);
+
+  function abrirEdicao(d: Detalhe) {
+    setEditForm({
+      cargo: d.cargo, area: d.area, nivelExp: d.nivelExp, localidade: d.localidade,
+      pretensao: d.pretensao != null ? String(d.pretensao) : '', disponibilidade: d.disponibilidade, status: d.status,
+    });
+    setEditOpen(true);
+  }
+  async function salvarEdicao() {
+    try {
+      await api.patch(`/curriculos/candidatos/${id}`, {
+        ...editForm,
+        pretensao: editForm.pretensao ? Number(editForm.pretensao) : undefined,
+      });
+      toast.success('Candidato atualizado');
+      setEditOpen(false);
+      carregar();
+    } catch (e) { toast.error(apiErrorMessage(e)); }
+  }
 
   async function carregar() {
     const { data } = await api.get<Detalhe>(`/curriculos/candidatos/${id}`);
@@ -184,8 +207,43 @@ function CandidatoDetail({ id, onVoltar }: { id: string; onVoltar: () => void })
           <h2 className="text-xl font-bold">{c.nome}</h2>
           <p className="text-sm text-muted-foreground">{c.cargo} · {c.area} · {c.localidade}</p>
         </div>
-        <Badge className="ml-auto" variant={STATUS_VARIANT[c.status] ?? 'secondary'}>{c.status}</Badge>
+        <Badge variant={STATUS_VARIANT[c.status] ?? 'secondary'}>{c.status}</Badge>
+        <Button variant="outline" size="sm" onClick={() => abrirEdicao(c)}>
+          <Pencil className="mr-1 h-4 w-4" /> Editar
+        </Button>
+        <ConfirmDelete
+          variant="outline"
+          size="sm"
+          onConfirm={() => api.delete(`/curriculos/candidatos/${id}`).then(onVoltar)}
+          descricao={`Remover ${c.nome} do banco de currículos?`}
+        >
+          <span className="flex items-center gap-1"><Trash2 className="h-4 w-4" /> Remover</span>
+        </ConfirmDelete>
       </div>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader><DialogTitle>Editar candidato</DialogTitle></DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5"><Label>Cargo</Label><Input value={editForm.cargo} onChange={(e) => setEditForm((f) => ({ ...f, cargo: e.target.value }))} /></div>
+            <div className="space-y-1.5"><Label>Área</Label><Input value={editForm.area} onChange={(e) => setEditForm((f) => ({ ...f, area: e.target.value }))} /></div>
+            <div className="space-y-1.5"><Label>Nível</Label><Input value={editForm.nivelExp} onChange={(e) => setEditForm((f) => ({ ...f, nivelExp: e.target.value }))} /></div>
+            <div className="space-y-1.5"><Label>Localidade</Label><Input value={editForm.localidade} onChange={(e) => setEditForm((f) => ({ ...f, localidade: e.target.value }))} /></div>
+            <div className="space-y-1.5"><Label>Pretensão (R$)</Label><Input type="number" value={editForm.pretensao} onChange={(e) => setEditForm((f) => ({ ...f, pretensao: e.target.value }))} /></div>
+            <div className="space-y-1.5"><Label>Disponibilidade</Label><Input value={editForm.disponibilidade} onChange={(e) => setEditForm((f) => ({ ...f, disponibilidade: e.target.value }))} /></div>
+            <div className="col-span-2 space-y-1.5">
+              <Label>Status</Label>
+              <Select value={editForm.status} onValueChange={(v) => setEditForm((f) => ({ ...f, status: String(v) }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {['DISPONIVEL', 'EM_PROCESSO', 'CONTRATADO', 'INATIVO'].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <Button className="w-full" onClick={salvarEdicao}>Salvar alterações</Button>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
@@ -220,7 +278,8 @@ function CandidatoDetail({ id, onVoltar }: { id: string; onVoltar: () => void })
                   <span className="flex items-center text-amber-500">
                     {Array.from({ length: a.nota }).map((_, i) => <Star key={i} className="h-3 w-3 fill-current" />)}
                   </span>
-                  <span className="text-muted-foreground">{a.comentario}</span>
+                  <span className="flex-1 text-muted-foreground">{a.comentario}</span>
+                  <ConfirmDelete onConfirm={() => api.delete(`/curriculos/avaliacoes/${a.id}`).then(carregar)} descricao="Remover esta avaliação?" />
                 </li>
               ))}
               {c.avaliacoes.length === 0 && <li className="text-muted-foreground">Sem avaliações.</li>}

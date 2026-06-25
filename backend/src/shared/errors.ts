@@ -39,6 +39,10 @@ export function registerErrorHandler(app: FastifyInstance) {
       const alvo = (error as { meta?: { target?: string[] } }).meta?.target?.join(', ') ?? 'campo';
       return reply.code(409).send({ error: `Já existe um registro com este ${alvo}` });
     }
+    // Violação de chave estrangeira (registro com vínculos) ao remover
+    if ((error as { code?: string }).code === 'P2003') {
+      return reply.code(409).send({ error: 'Não é possível remover: há registros vinculados a este item.' });
+    }
     if (status && status < 500) {
       return reply.code(status).send({ error: error.message });
     }

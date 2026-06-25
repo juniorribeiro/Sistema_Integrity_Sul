@@ -4,6 +4,7 @@ import { CalendarDays, Video, MapPin, ExternalLink } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ConfirmDelete } from '@/components/shared/confirm-delete';
 
 export interface Agendamento {
   id: string;
@@ -33,10 +34,12 @@ export function AgendamentoCard({
   agendamento: a,
   perfil,
   onStatus,
+  onRemover,
 }: {
   agendamento: Agendamento;
   perfil: 'profissional' | 'funcionario';
   onStatus: (id: string, status: string) => void;
+  onRemover?: (id: string) => Promise<void> | void;
 }) {
   const st = STATUS[a.status];
   const finalizado = a.status === 'REALIZADO' || a.status === 'CANCELADO';
@@ -45,9 +48,14 @@ export function AgendamentoCard({
   return (
     <Card>
       <CardContent className="space-y-3 py-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-semibold">{SETOR_LABEL[a.setor] ?? a.setor}</span>
-          <Badge variant={st.variant}>{st.label}</Badge>
+          <div className="flex items-center gap-1">
+            <Badge variant={st.variant}>{st.label}</Badge>
+            {perfil === 'profissional' && onRemover && (
+              <ConfirmDelete onConfirm={() => onRemover(a.id)} descricao="Remover este agendamento?" />
+            )}
+          </div>
         </div>
         <div className="space-y-1 text-sm">
           <p className="flex items-center gap-2">

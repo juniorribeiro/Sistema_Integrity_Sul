@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { ArrowLeft, Upload, Download, Plus, Check, FileText } from 'lucide-react';
+import { ArrowLeft, Upload, Download, Plus, Check, FileText, Trash2 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ConfirmDelete } from '@/components/shared/confirm-delete';
 
 interface Prontuario {
   id: string;
@@ -128,12 +129,20 @@ export function ProntuarioDetail({ prontuarioId, onVoltar }: { prontuarioId: str
         <Button variant="ghost" size="icon" onClick={onVoltar} aria-label="Voltar">
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
+        <div className="flex-1">
           <h2 className="text-xl font-bold">{pront.funcionario.nome}</h2>
           <p className="text-sm text-muted-foreground">
             {pront.funcionario.cargo} · {pront.funcionario.empresa.razaoSocial}
           </p>
         </div>
+        <ConfirmDelete
+          variant="outline"
+          size="sm"
+          onConfirm={() => api.delete(`/psicologia/prontuarios/${prontuarioId}`).then(onVoltar)}
+          descricao="Encerrar e remover este prontuário e todo o histórico?"
+        >
+          <span className="flex items-center gap-1"><Trash2 className="h-4 w-4" /> Encerrar</span>
+        </ConfirmDelete>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -207,9 +216,12 @@ export function ProntuarioDetail({ prontuarioId, onVoltar }: { prontuarioId: str
           ) : (
             <ul className="divide-y">
               {pront.sessoes.map((s) => (
-                <li key={s.id} className="py-2 text-sm">
-                  <span className="font-medium">{fmt(s.data)}</span> — {s.evolucao}
-                  {s.proximaData && <span className="text-muted-foreground"> · próxima: {fmt(s.proximaData)}</span>}
+                <li key={s.id} className="flex items-start justify-between gap-2 py-2 text-sm">
+                  <span>
+                    <span className="font-medium">{fmt(s.data)}</span> — {s.evolucao}
+                    {s.proximaData && <span className="text-muted-foreground"> · próxima: {fmt(s.proximaData)}</span>}
+                  </span>
+                  <ConfirmDelete onConfirm={() => api.delete(`/psicologia/sessoes/${s.id}`).then(carregar)} descricao="Remover esta sessão?" />
                 </li>
               ))}
             </ul>
@@ -232,13 +244,14 @@ export function ProntuarioDetail({ prontuarioId, onVoltar }: { prontuarioId: str
             </div>
             <ul className="space-y-1">
               {pront.metas.map((m) => (
-                <li key={m.id}>
-                  <button onClick={() => toggleMeta(m.id, m.atingida)} className="flex w-full items-center gap-2 rounded px-1 py-1 text-left text-sm hover:bg-muted">
+                <li key={m.id} className="flex items-center gap-1">
+                  <button onClick={() => toggleMeta(m.id, m.atingida)} className="flex flex-1 items-center gap-2 rounded px-1 py-1 text-left text-sm hover:bg-muted">
                     <span className={`flex h-4 w-4 items-center justify-center rounded border ${m.atingida ? 'border-green-600 bg-green-600 text-white' : 'border-input'}`}>
                       {m.atingida && <Check className="h-3 w-3" />}
                     </span>
                     <span className={m.atingida ? 'text-muted-foreground line-through' : ''}>{m.descricao}</span>
                   </button>
+                  <ConfirmDelete onConfirm={() => api.delete(`/psicologia/metas/${m.id}`).then(carregar)} descricao="Remover esta meta?" />
                 </li>
               ))}
             </ul>
@@ -269,9 +282,12 @@ export function ProntuarioDetail({ prontuarioId, onVoltar }: { prontuarioId: str
                     <span className="flex items-center gap-2 truncate">
                       <FileText className="h-4 w-4 shrink-0 text-muted-foreground" /> {d.nomeArq}
                     </span>
-                    <Button size="icon" variant="ghost" onClick={() => baixar(d.id)} aria-label="Baixar">
-                      <Download className="h-4 w-4" />
-                    </Button>
+                    <span className="flex items-center">
+                      <Button size="icon" variant="ghost" onClick={() => baixar(d.id)} aria-label="Baixar">
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      <ConfirmDelete onConfirm={() => api.delete(`/psicologia/documentos/${d.id}`).then(carregar)} descricao={`Remover ${d.nomeArq}?`} />
+                    </span>
                   </li>
                 ))}
               </ul>

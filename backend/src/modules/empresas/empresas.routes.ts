@@ -35,6 +35,11 @@ export default async function empresasRoutes(app: FastifyInstance) {
     return service.atualizar(id, input);
   });
 
+  app.delete('/:id', { preHandler: app.authorize([...GESTAO]) }, async (req) => {
+    const { id } = req.params as { id: string };
+    return service.remover(id);
+  });
+
   app.post('/:id/regenerar-url', { preHandler: app.authorize([...GESTAO]) }, async (req) => {
     const { id } = req.params as { id: string };
     const body = (req.body ?? {}) as { validadeDias?: number };

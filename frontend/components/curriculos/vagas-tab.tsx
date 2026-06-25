@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { Plus, ArrowLeft, UserPlus } from 'lucide-react';
+import { Plus, ArrowLeft, UserPlus, Trash2 } from 'lucide-react';
+import { ConfirmDelete } from '@/components/shared/confirm-delete';
 import { api, apiErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -122,6 +123,9 @@ function VagaPipeline({ id, onVoltar }: { id: string; onVoltar: () => void }) {
           <h2 className="text-xl font-bold">{v.titulo}</h2>
           <p className="text-sm text-muted-foreground">{v.area}</p>
         </div>
+        <ConfirmDelete variant="outline" size="sm" onConfirm={() => api.delete(`/curriculos/vagas/${id}`).then(onVoltar)} descricao={`Remover a vaga "${v.titulo}" e seu pipeline?`}>
+          <span className="flex items-center gap-1"><Trash2 className="h-4 w-4" /> Remover vaga</span>
+        </ConfirmDelete>
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
           <DialogTrigger render={<Button size="sm"><UserPlus className="mr-1 h-4 w-4" /> Adicionar</Button>} />
           <DialogContent className="sm:max-w-sm">
@@ -150,12 +154,15 @@ function VagaPipeline({ id, onVoltar }: { id: string; onVoltar: () => void }) {
                   <p className="font-medium">{p.candidato.nome}</p>
                   <p className="text-xs text-muted-foreground">{p.candidato.cargo}</p>
                 </div>
-                <Select value={p.etapa} onValueChange={(val) => mover(p.id, String(val))}>
-                  <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {ETAPAS.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center gap-1">
+                  <Select value={p.etapa} onValueChange={(val) => mover(p.id, String(val))}>
+                    <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {ETAPAS.map((e) => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <ConfirmDelete onConfirm={() => api.delete(`/curriculos/vaga-candidatos/${p.id}`).then(carregar)} descricao="Remover este candidato do pipeline?" />
+                </div>
               </CardContent>
             </Card>
           ))}

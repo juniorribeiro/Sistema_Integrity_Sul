@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { ArrowLeft, Upload, Download, Plus, Check, FileText } from 'lucide-react';
+import { ArrowLeft, Upload, Download, Plus, Check, FileText, Trash2 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LinhaTriagem } from '@/components/atendimento/prontuario-simples';
+import { ConfirmDelete } from '@/components/shared/confirm-delete';
 
 interface Caso {
   id: string;
@@ -111,12 +112,20 @@ export function CasoDetail({ casoId, onVoltar }: { casoId: string; onVoltar: () 
         <Button variant="ghost" size="icon" onClick={onVoltar} aria-label="Voltar">
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
+        <div className="flex-1">
           <h2 className="text-xl font-bold">{c.titulo}</h2>
           <p className="text-sm text-muted-foreground">
             {c.areaDir} · {c.funcionario.nome} · {c.funcionario.empresa.razaoSocial}
           </p>
         </div>
+        <ConfirmDelete
+          variant="outline"
+          size="sm"
+          onConfirm={() => api.delete(`/juridico/casos/${casoId}`).then(onVoltar)}
+          descricao="Remover este caso e todos os prazos/documentos?"
+        >
+          <span className="flex items-center gap-1"><Trash2 className="h-4 w-4" /> Remover caso</span>
+        </ConfirmDelete>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -198,8 +207,8 @@ export function CasoDetail({ casoId, onVoltar }: { casoId: string; onVoltar: () 
             </div>
             <ul className="space-y-1">
               {c.prazos.map((pz) => (
-                <li key={pz.id}>
-                  <button onClick={() => togglePrazo(pz.id, pz.cumprido)} className="flex w-full items-center gap-2 rounded px-1 py-1 text-left text-sm hover:bg-muted">
+                <li key={pz.id} className="flex items-center gap-1">
+                  <button onClick={() => togglePrazo(pz.id, pz.cumprido)} className="flex flex-1 items-center gap-2 rounded px-1 py-1 text-left text-sm hover:bg-muted">
                     <span className={`flex h-4 w-4 items-center justify-center rounded border ${pz.cumprido ? 'border-green-600 bg-green-600 text-white' : 'border-input'}`}>
                       {pz.cumprido && <Check className="h-3 w-3" />}
                     </span>
@@ -207,6 +216,7 @@ export function CasoDetail({ casoId, onVoltar }: { casoId: string; onVoltar: () 
                       {pz.descricao} — {fmt(pz.data)}
                     </span>
                   </button>
+                  <ConfirmDelete onConfirm={() => api.delete(`/juridico/prazos/${pz.id}`).then(carregar)} descricao="Remover este prazo?" />
                 </li>
               ))}
             </ul>
@@ -231,9 +241,12 @@ export function CasoDetail({ casoId, onVoltar }: { casoId: string; onVoltar: () 
                     <span className="flex items-center gap-2 truncate">
                       <FileText className="h-4 w-4 shrink-0 text-muted-foreground" /> {d.nomeArq}
                     </span>
-                    <Button size="icon" variant="ghost" onClick={() => baixar(d.id)} aria-label="Baixar">
-                      <Download className="h-4 w-4" />
-                    </Button>
+                    <span className="flex items-center">
+                      <Button size="icon" variant="ghost" onClick={() => baixar(d.id)} aria-label="Baixar">
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      <ConfirmDelete onConfirm={() => api.delete(`/juridico/documentos/${d.id}`).then(carregar)} descricao={`Remover ${d.nomeArq}?`} />
+                    </span>
                   </li>
                 ))}
               </ul>

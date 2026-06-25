@@ -98,5 +98,35 @@ export function createFuncionariosService(app: FastifyInstance) {
     return f;
   }
 
-  return { autocadastro, listar, obter, empresaIdDoRH };
+  async function atualizar(
+    id: string,
+    input: { nome?: string; cargo?: string; telefone?: string; ativo?: boolean },
+    restringirEmpresaId?: string,
+  ) {
+    await obter(id, restringirEmpresaId);
+    const { ativo, ...dados } = input;
+    const f = await app.prisma.funcionario.update({
+      where: { id },
+      data: {
+        ...dados,
+        ...(ativo !== undefined ? { usuario: { update: { ativo } } } : {}),
+      },
+      select: { id: true, nome: true, cargo: true, telefone: true },
+    });
+    return f;
+  }
+
+  /** Remove o funcionário e tudo vinculado (via cascata ao apagar o usuário). */
+  async function remover(id: string, restringirEmpresaId?: string) {
+    const f = await app.prisma.funcionario.findUnique({ where: { id }, select: { usuarioId: true, empresaId: true } });
+    if (!f) throw new AppError(404, 'Funcionário não encontrado');
+    if (restringirEmpresaId && f.empresaId !== restringirEmpresaId) {
+      throw new AppError(403, 'Acesso negado a funcionário de outra empresa');
+    }
+    // Apagar o usuário cascateia: funcionário, triagem, prontuários, agendamentos, consentimentos
+    await app.prisma.usuario.delete({ where: { id: f.usuarioId } });
+    return { ok: true };
+  }
+
+  return { autocadastro, listar, obter, empresaIdDoRH, atualizar, remover };
 }

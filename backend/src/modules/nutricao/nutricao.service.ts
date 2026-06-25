@@ -118,6 +118,36 @@ export function createNutricaoService(app: FastifyInstance) {
     });
   }
 
+  async function removerConsulta(consultaId: string, usuarioId: string, role: string) {
+    const c = await app.prisma.consultaNutricao.findUnique({ where: { id: consultaId } });
+    if (!c) throw new AppError(404, 'Consulta não encontrada');
+    await carregarAutorizado(c.prontuarioId, usuarioId, role);
+    await app.prisma.consultaNutricao.delete({ where: { id: consultaId } });
+    return { ok: true };
+  }
+  async function removerEvolucao(evolucaoId: string, usuarioId: string, role: string) {
+    const e = await app.prisma.evolucaoNutricao.findUnique({ where: { id: evolucaoId } });
+    if (!e) throw new AppError(404, 'Evolução não encontrada');
+    await carregarAutorizado(e.prontuarioId, usuarioId, role);
+    await app.prisma.evolucaoNutricao.delete({ where: { id: evolucaoId } });
+    return { ok: true };
+  }
+  async function removerDocumento(docId: string, usuarioId: string, role: string) {
+    const doc = await app.prisma.documentoStorage.findUnique({ where: { id: docId } });
+    if (!doc || doc.setor !== 'NUTRICAO' || !doc.prontuarioNutricaoId) throw new AppError(404, 'Documento não encontrado');
+    await carregarAutorizado(doc.prontuarioNutricaoId, usuarioId, role);
+    await app.garage.deleteObject(doc.bucket, doc.objectKey).catch(() => {});
+    await app.prisma.documentoStorage.delete({ where: { id: docId } });
+    return { ok: true };
+  }
+  async function removerProntuario(prontuarioId: string, usuarioId: string, role: string) {
+    await carregarAutorizado(prontuarioId, usuarioId, role);
+    const docs = await app.prisma.documentoStorage.findMany({ where: { prontuarioNutricaoId: prontuarioId }, select: { bucket: true, objectKey: true } });
+    await Promise.allSettled(docs.map((d) => app.garage.deleteObject(d.bucket, d.objectKey)));
+    await app.prisma.prontuarioNutricao.delete({ where: { id: prontuarioId } });
+    return { ok: true };
+  }
+
   return {
     listarFuncionarios,
     criarProntuario,
@@ -128,5 +158,9 @@ export function createNutricaoService(app: FastifyInstance) {
     adicionarDocumento,
     urlDownloadDocumento,
     meuProntuario,
+    removerConsulta,
+    removerEvolucao,
+    removerDocumento,
+    removerProntuario,
   };
 }

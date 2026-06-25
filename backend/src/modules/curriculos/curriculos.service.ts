@@ -121,11 +121,44 @@ export function createCurriculosService(app: FastifyInstance) {
     return app.prisma.vagaCandidato.update({ where: { id: vagaCandidatoId }, data: input });
   }
 
+  async function removerCandidato(id: string) {
+    const cand = await app.prisma.candidato.findUnique({ where: { id }, select: { curriculoKey: true } });
+    if (!cand) throw new AppError(404, 'Candidato não encontrado');
+    if (cand.curriculoKey) await app.garage.deleteObject(BUCKET, cand.curriculoKey).catch(() => {});
+    await app.prisma.candidato.delete({ where: { id } }); // cascateia avaliações e itens de pipeline
+    return { ok: true };
+  }
+
+  async function removerAvaliacao(avaliacaoId: string) {
+    const a = await app.prisma.avaliacaoCandidato.findUnique({ where: { id: avaliacaoId } });
+    if (!a) throw new AppError(404, 'Avaliação não encontrada');
+    await app.prisma.avaliacaoCandidato.delete({ where: { id: avaliacaoId } });
+    return { ok: true };
+  }
+
+  async function removerVaga(id: string) {
+    const v = await app.prisma.vaga.findUnique({ where: { id } });
+    if (!v) throw new AppError(404, 'Vaga não encontrada');
+    await app.prisma.vaga.delete({ where: { id } }); // cascateia itens de pipeline
+    return { ok: true };
+  }
+
+  async function removerDoPipeline(vagaCandidatoId: string) {
+    const vc = await app.prisma.vagaCandidato.findUnique({ where: { id: vagaCandidatoId } });
+    if (!vc) throw new AppError(404, 'Item de pipeline não encontrado');
+    await app.prisma.vagaCandidato.delete({ where: { id: vagaCandidatoId } });
+    return { ok: true };
+  }
+
   return {
     listarCandidatos,
     criarCandidato,
     obterCandidato,
     atualizarCandidato,
+    removerCandidato,
+    removerAvaliacao,
+    removerVaga,
+    removerDoPipeline,
     uploadCurriculo,
     urlCurriculo,
     avaliar,

@@ -173,6 +173,39 @@ export function createPsicologiaService(app: FastifyInstance) {
     return pront;
   }
 
+  async function removerSessao(sessaoId: string, usuarioId: string, role: string) {
+    const s = await app.prisma.sessaoPsicologia.findUnique({ where: { id: sessaoId } });
+    if (!s) throw new AppError(404, 'Sessão não encontrada');
+    await carregarProntuarioAutorizado(s.prontuarioId, usuarioId, role);
+    await app.prisma.sessaoPsicologia.delete({ where: { id: sessaoId } });
+    return { ok: true };
+  }
+
+  async function removerMeta(metaId: string, usuarioId: string, role: string) {
+    const m = await app.prisma.metaPsicologia.findUnique({ where: { id: metaId } });
+    if (!m) throw new AppError(404, 'Meta não encontrada');
+    await carregarProntuarioAutorizado(m.prontuarioId, usuarioId, role);
+    await app.prisma.metaPsicologia.delete({ where: { id: metaId } });
+    return { ok: true };
+  }
+
+  async function removerDocumento(docId: string, usuarioId: string, role: string) {
+    const doc = await app.prisma.documentoStorage.findUnique({ where: { id: docId } });
+    if (!doc || doc.setor !== 'PSICOLOGIA' || !doc.prontuarioPsicologiaId) throw new AppError(404, 'Documento não encontrado');
+    await carregarProntuarioAutorizado(doc.prontuarioPsicologiaId, usuarioId, role);
+    await app.garage.deleteObject(doc.bucket, doc.objectKey).catch(() => {});
+    await app.prisma.documentoStorage.delete({ where: { id: docId } });
+    return { ok: true };
+  }
+
+  async function removerProntuario(prontuarioId: string, usuarioId: string, role: string) {
+    await carregarProntuarioAutorizado(prontuarioId, usuarioId, role);
+    const docs = await app.prisma.documentoStorage.findMany({ where: { prontuarioPsicologiaId: prontuarioId }, select: { bucket: true, objectKey: true } });
+    await Promise.allSettled(docs.map((d) => app.garage.deleteObject(d.bucket, d.objectKey)));
+    await app.prisma.prontuarioPsicologia.delete({ where: { id: prontuarioId } });
+    return { ok: true };
+  }
+
   return {
     listarFuncionarios,
     criarProntuario,
@@ -184,5 +217,9 @@ export function createPsicologiaService(app: FastifyInstance) {
     adicionarDocumento,
     urlDownloadDocumento,
     meuProntuario,
+    removerSessao,
+    removerMeta,
+    removerDocumento,
+    removerProntuario,
   };
 }

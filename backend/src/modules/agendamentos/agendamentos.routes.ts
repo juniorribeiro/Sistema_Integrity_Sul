@@ -24,4 +24,9 @@ export default async function agendamentosRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     return service.atualizarStatus(id, req.user.sub, req.user.role, validate(atualizarStatusSchema, req.body));
   });
+
+  app.delete('/:id', { preHandler: app.authorize([...PROF]) }, async (req) => {
+    const { id } = req.params as { id: string };
+    return service.remover(id, req.user.sub, req.user.role);
+  });
 }

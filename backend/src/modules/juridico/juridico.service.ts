@@ -142,6 +142,29 @@ export function createJuridicoService(app: FastifyInstance) {
     });
   }
 
+  async function removerPrazo(prazoId: string, usuarioId: string, role: string) {
+    const p = await app.prisma.prazoJuridico.findUnique({ where: { id: prazoId } });
+    if (!p) throw new AppError(404, 'Prazo não encontrado');
+    await carregarCasoAutorizado(p.prontuarioId, usuarioId, role);
+    await app.prisma.prazoJuridico.delete({ where: { id: prazoId } });
+    return { ok: true };
+  }
+  async function removerDocumento(docId: string, usuarioId: string, role: string) {
+    const doc = await app.prisma.documentoStorage.findUnique({ where: { id: docId } });
+    if (!doc || doc.setor !== 'JURIDICO' || !doc.prontuarioJuridicoId) throw new AppError(404, 'Documento não encontrado');
+    await carregarCasoAutorizado(doc.prontuarioJuridicoId, usuarioId, role);
+    await app.garage.deleteObject(doc.bucket, doc.objectKey).catch(() => {});
+    await app.prisma.documentoStorage.delete({ where: { id: docId } });
+    return { ok: true };
+  }
+  async function removerCaso(casoId: string, usuarioId: string, role: string) {
+    await carregarCasoAutorizado(casoId, usuarioId, role);
+    const docs = await app.prisma.documentoStorage.findMany({ where: { prontuarioJuridicoId: casoId }, select: { bucket: true, objectKey: true } });
+    await Promise.allSettled(docs.map((d) => app.garage.deleteObject(d.bucket, d.objectKey)));
+    await app.prisma.prontuarioJuridico.delete({ where: { id: casoId } });
+    return { ok: true };
+  }
+
   return {
     listarFuncionarios,
     listarCasosDoFuncionario,
@@ -153,5 +176,8 @@ export function createJuridicoService(app: FastifyInstance) {
     adicionarDocumento,
     urlDownloadDocumento,
     meusCasos,
+    removerPrazo,
+    removerDocumento,
+    removerCaso,
   };
 }

@@ -106,6 +106,29 @@ export function createFinanceiroAtendimentoService(app: FastifyInstance) {
     });
   }
 
+  async function removerConsulta(consultaId: string, usuarioId: string, role: string) {
+    const c = await app.prisma.consultaFinanceira.findUnique({ where: { id: consultaId } });
+    if (!c) throw new AppError(404, 'Consulta não encontrada');
+    await carregarAutorizado(c.prontuarioId, usuarioId, role);
+    await app.prisma.consultaFinanceira.delete({ where: { id: consultaId } });
+    return { ok: true };
+  }
+  async function removerDocumento(docId: string, usuarioId: string, role: string) {
+    const doc = await app.prisma.documentoStorage.findUnique({ where: { id: docId } });
+    if (!doc || doc.setor !== 'FINANCEIRO' || !doc.prontuarioFinanceiroId) throw new AppError(404, 'Documento não encontrado');
+    await carregarAutorizado(doc.prontuarioFinanceiroId, usuarioId, role);
+    await app.garage.deleteObject(doc.bucket, doc.objectKey).catch(() => {});
+    await app.prisma.documentoStorage.delete({ where: { id: docId } });
+    return { ok: true };
+  }
+  async function removerProntuario(prontuarioId: string, usuarioId: string, role: string) {
+    await carregarAutorizado(prontuarioId, usuarioId, role);
+    const docs = await app.prisma.documentoStorage.findMany({ where: { prontuarioFinanceiroId: prontuarioId }, select: { bucket: true, objectKey: true } });
+    await Promise.allSettled(docs.map((d) => app.garage.deleteObject(d.bucket, d.objectKey)));
+    await app.prisma.prontuarioFinanceiro.delete({ where: { id: prontuarioId } });
+    return { ok: true };
+  }
+
   return {
     listarFuncionarios,
     criarProntuario,
@@ -115,5 +138,8 @@ export function createFinanceiroAtendimentoService(app: FastifyInstance) {
     adicionarDocumento,
     urlDownloadDocumento,
     meuProntuario,
+    removerConsulta,
+    removerDocumento,
+    removerProntuario,
   };
 }

@@ -44,6 +44,8 @@ export default async function curriculosRoutes(app: FastifyInstance) {
     const r = await service.avaliar((req.params as { id: string }).id, req.user.sub, validate(avaliacaoSchema, req.body));
     return reply.code(201).send(r);
   });
+  app.delete('/candidatos/:id', guard, async (req) => service.removerCandidato((req.params as { id: string }).id));
+  app.delete('/avaliacoes/:id', guard, async (req) => service.removerAvaliacao((req.params as { id: string }).id));
 
   // Vagas / pipeline
   app.get('/vagas', guard, async () => service.listarVagas());
@@ -64,4 +66,6 @@ export default async function curriculosRoutes(app: FastifyInstance) {
   app.patch('/vaga-candidatos/:id', guard, async (req) =>
     service.moverEtapa((req.params as { id: string }).id, validate(moverEtapaSchema, req.body)),
   );
+  app.delete('/vaga-candidatos/:id', guard, async (req) => service.removerDoPipeline((req.params as { id: string }).id));
+  app.delete('/vagas/:id', guard, async (req) => service.removerVaga((req.params as { id: string }).id));
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
-import { ArrowLeft, Upload, Download, Plus, FileText } from 'lucide-react';
+import { ArrowLeft, Upload, Download, Plus, FileText, Trash2 } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ConfirmDelete } from '@/components/shared/confirm-delete';
 
 export interface ProntuarioSimplesConfig {
   base: string; // ex.: '/nutricao'
@@ -123,12 +124,20 @@ export function ProntuarioSimplesDetail({
         <Button variant="ghost" size="icon" onClick={onVoltar} aria-label="Voltar">
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
+        <div className="flex-1">
           <h2 className="text-xl font-bold">{p.funcionario.nome}</h2>
           <p className="text-sm text-muted-foreground">
             {p.funcionario.cargo} · {p.funcionario.empresa.razaoSocial}
           </p>
         </div>
+        <ConfirmDelete
+          variant="outline"
+          size="sm"
+          onConfirm={() => api.delete(`${config.base}/prontuarios/${prontuarioId}`).then(onVoltar)}
+          descricao="Encerrar e remover este prontuário e todo o histórico?"
+        >
+          <span className="flex items-center gap-1"><Trash2 className="h-4 w-4" /> Encerrar</span>
+        </ConfirmDelete>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -181,9 +190,12 @@ export function ProntuarioSimplesDetail({
           ) : (
             <ul className="divide-y">
               {p.consultas.map((c) => (
-                <li key={c.id} className="py-2 text-sm">
-                  <span className="font-medium">{fmt(c.data)}</span> — {c.anotacoes}
-                  {c.proximaData && <span className="text-muted-foreground"> · próxima: {fmt(c.proximaData)}</span>}
+                <li key={c.id} className="flex items-start justify-between gap-2 py-2 text-sm">
+                  <span>
+                    <span className="font-medium">{fmt(c.data)}</span> — {c.anotacoes}
+                    {c.proximaData && <span className="text-muted-foreground"> · próxima: {fmt(c.proximaData)}</span>}
+                  </span>
+                  <ConfirmDelete onConfirm={() => api.delete(`${config.base}/consultas/${c.id}`).then(carregar)} descricao="Remover esta consulta?" />
                 </li>
               ))}
             </ul>
@@ -208,9 +220,12 @@ export function ProntuarioSimplesDetail({
               </div>
               <ul className="space-y-1 text-sm">
                 {p.evolucoes?.map((e) => (
-                  <li key={e.id}>
-                    {fmt(e.data)}: <span className="font-medium">{e.pesoKg} kg</span>
-                    {e.imc && ` · IMC ${e.imc}`}
+                  <li key={e.id} className="flex items-center justify-between">
+                    <span>
+                      {fmt(e.data)}: <span className="font-medium">{e.pesoKg} kg</span>
+                      {e.imc && ` · IMC ${e.imc}`}
+                    </span>
+                    <ConfirmDelete onConfirm={() => api.delete(`${config.base}/evolucoes/${e.id}`).then(carregar)} descricao="Remover este registro de evolução?" />
                   </li>
                 ))}
               </ul>
@@ -236,9 +251,12 @@ export function ProntuarioSimplesDetail({
                     <span className="flex items-center gap-2 truncate">
                       <FileText className="h-4 w-4 shrink-0 text-muted-foreground" /> {d.nomeArq}
                     </span>
-                    <Button size="icon" variant="ghost" onClick={() => baixar(d.id)} aria-label="Baixar">
-                      <Download className="h-4 w-4" />
-                    </Button>
+                    <span className="flex items-center">
+                      <Button size="icon" variant="ghost" onClick={() => baixar(d.id)} aria-label="Baixar">
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      <ConfirmDelete onConfirm={() => api.delete(`${config.base}/documentos/${d.id}`).then(carregar)} descricao={`Remover ${d.nomeArq}?`} />
+                    </span>
                   </li>
                 ))}
               </ul>

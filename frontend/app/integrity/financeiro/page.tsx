@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { toast } from 'sonner';
-import { Plus, TrendingUp, TrendingDown, Wallet } from 'lucide-react';
+import { Plus, TrendingUp, TrendingDown, Wallet, Pencil } from 'lucide-react';
 import { api, apiErrorMessage } from '@/lib/api';
 import { PageHeader } from '@/components/layouts/page-header';
+import { ConfirmDelete } from '@/components/shared/confirm-delete';
 import { StatCard } from '@/components/shared/stat-card';
 import { formatBRL } from '@/components/metricas/setor-bars';
 import { Button } from '@/components/ui/button';
@@ -47,6 +48,8 @@ export default function FinanceiroInterno() {
   const [resumo, setResumo] = useState<Resumo | null>(null);
   const [lancs, setLancs] = useState<Lancamento[] | null>(null);
   const [open, setOpen] = useState(false);
+  const [editando, setEditando] = useState<Lancamento | null>(null);
+  const [editForm, setEditForm] = useState({ categoria: '', descricao: '', valor: '', data: '', status: 'PAGO' });
   const { register, handleSubmit, control, reset } = useForm<Record<string, string>>();
 
   async function carregar() {
@@ -61,6 +64,33 @@ export default function FinanceiroInterno() {
     carregar().catch(() => { setResumo(null); setLancs([]); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function abrirEdicao(l: Lancamento) {
+    setEditForm({ categoria: l.categoria, descricao: l.descricao, valor: String(l.valor), data: l.data.slice(0, 10), status: l.status });
+    setEditando(l);
+  }
+  async function salvarEdicao() {
+    if (!editando) return;
+    try {
+      await api.patch(`/financeiro-integrity/lancamentos/${editando.id}`, {
+        categoria: editForm.categoria,
+        descricao: editForm.descricao,
+        valor: Number(editForm.valor),
+        data: editForm.data,
+        status: editForm.status,
+      });
+      toast.success('Lançamento atualizado');
+      setEditando(null);
+      carregar();
+    } catch (e) {
+      toast.error(apiErrorMessage(e));
+    }
+  }
+  async function remover(id: string) {
+    await api.delete(`/financeiro-integrity/lancamentos/${id}`);
+    toast.success('Lançamento removido');
+    carregar();
+  }
 
   async function criar(d: Record<string, string>) {
     try {
@@ -191,6 +221,7 @@ export default function FinanceiroInterno() {
                   <TableHead className="hidden sm:table-cell">Categoria</TableHead>
                   <TableHead>Valor</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -205,6 +236,14 @@ export default function FinanceiroInterno() {
                     <TableCell>
                       <Badge variant={STATUS_VARIANT[l.status] ?? 'secondary'}>{l.status}</Badge>
                     </TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => abrirEdicao(l)} aria-label="Editar">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <ConfirmDelete onConfirm={() => remover(l.id)} descricao={`Remover o lançamento "${l.descricao}"?`} />
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -212,6 +251,44 @@ export default function FinanceiroInterno() {
           </div>
         )}
       </div>
+
+      <Dialog open={!!editando} onOpenChange={(o) => !o && setEditando(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Editar lançamento</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="el-cat">Categoria</Label>
+              <Input id="el-cat" value={editForm.categoria} onChange={(e) => setEditForm((f) => ({ ...f, categoria: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="el-desc">Descrição</Label>
+              <Input id="el-desc" value={editForm.descricao} onChange={(e) => setEditForm((f) => ({ ...f, descricao: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="el-valor">Valor (R$)</Label>
+                <Input id="el-valor" type="number" step="0.01" value={editForm.valor} onChange={(e) => setEditForm((f) => ({ ...f, valor: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="el-data">Data</Label>
+                <Input id="el-data" type="date" value={editForm.data} onChange={(e) => setEditForm((f) => ({ ...f, data: e.target.value }))} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={editForm.status} onValueChange={(v) => setEditForm((f) => ({ ...f, status: String(v) }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PAGO">Pago</SelectItem>
+                  <SelectItem value="PENDENTE">Pendente</SelectItem>
+                  <SelectItem value="CANCELADO">Cancelado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button className="w-full" onClick={salvarEdicao}>Salvar alterações</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

@@ -82,12 +82,20 @@ export function createColaboradoresService(app: FastifyInstance) {
     });
   }
 
-  async function desativar(id: string) {
+  /** Remove o colaborador. Bloqueia (409) se houver atendimentos vinculados — nesse caso, desative pela edição. */
+  async function remover(id: string) {
     const c = await app.prisma.colaborador.findUnique({ where: { id } });
     if (!c) throw new AppError(404, 'Colaborador não encontrado');
-    await app.prisma.usuario.update({ where: { id: c.usuarioId }, data: { ativo: false } });
+    try {
+      await app.prisma.usuario.delete({ where: { id: c.usuarioId } }); // cascateia o colaborador
+    } catch (e) {
+      if ((e as { code?: string }).code === 'P2003') {
+        throw new AppError(409, 'Este profissional possui atendimentos ou agendamentos vinculados. Desative-o (na edição) em vez de remover.');
+      }
+      throw e;
+    }
     return { ok: true };
   }
 
-  return { criar, listar, obter, atualizar, desativar };
+  return { criar, listar, obter, atualizar, remover };
 }

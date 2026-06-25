@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { validate } from '../../shared/errors.js';
 import { createFuncionariosService } from './funcionarios.service.js';
-import { autocadastroSchema } from './funcionarios.schemas.js';
+import { autocadastroSchema, atualizarFuncionarioSchema } from './funcionarios.schemas.js';
 
 export default async function funcionariosRoutes(app: FastifyInstance) {
   const service = createFuncionariosService(app);
@@ -40,4 +40,19 @@ export default async function funcionariosRoutes(app: FastifyInstance) {
       return service.obter(id, restricao);
     },
   );
+
+  const GESTAO = ['DIRETORIA', 'CONSULTOR_RH', 'RH_CLIENTE'] as const;
+
+  app.patch('/:id', { preHandler: app.authorize([...GESTAO]) }, async (req) => {
+    const { id } = req.params as { id: string };
+    const input = validate(atualizarFuncionarioSchema, req.body);
+    const restricao = req.user.role === 'RH_CLIENTE' ? await service.empresaIdDoRH(req.user.sub) : undefined;
+    return service.atualizar(id, input, restricao);
+  });
+
+  app.delete('/:id', { preHandler: app.authorize([...GESTAO]) }, async (req) => {
+    const { id } = req.params as { id: string };
+    const restricao = req.user.role === 'RH_CLIENTE' ? await service.empresaIdDoRH(req.user.sub) : undefined;
+    return service.remover(id, restricao);
+  });
 }

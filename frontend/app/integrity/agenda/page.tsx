@@ -74,6 +74,12 @@ export default function AgendaProfissional() {
     }
   }
 
+  async function remover(id: string) {
+    await api.delete(`/agendamentos/${id}`);
+    toast.success('Agendamento removido');
+    carregar();
+  }
+
   return (
     <>
       <PageHeader
@@ -166,7 +172,7 @@ export default function AgendaProfissional() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {lista.map((a) => (
-            <AgendamentoCard key={a.id} agendamento={a} perfil="profissional" onStatus={mudarStatus} />
+            <AgendamentoCard key={a.id} agendamento={a} perfil="profissional" onStatus={mudarStatus} onRemover={remover} />
           ))}
         </div>
       )}

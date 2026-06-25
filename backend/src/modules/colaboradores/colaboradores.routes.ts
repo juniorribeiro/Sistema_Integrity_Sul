@@ -31,6 +31,6 @@ export default async function colaboradoresRoutes(app: FastifyInstance) {
 
   app.delete('/:id', { preHandler: app.authorize(['DIRETORIA']) }, async (req) => {
     const { id } = req.params as { id: string };
-    return service.desativar(id);
+    return service.remover(id);
   });
 }

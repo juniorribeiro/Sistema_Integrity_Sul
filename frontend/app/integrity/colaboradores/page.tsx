@@ -5,12 +5,13 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Plus, Users } from 'lucide-react';
+import { Plus, Users, Pencil } from 'lucide-react';
 
 import { api, apiErrorMessage } from '@/lib/api';
 import { ROLE_LABEL } from '@/lib/nav';
 import type { Role } from '@/lib/types';
 import { PageHeader } from '@/components/layouts/page-header';
+import { ConfirmDelete } from '@/components/shared/confirm-delete';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,6 +35,8 @@ interface Colaborador {
   id: string;
   nome: string;
   cpf: string;
+  telefone?: string | null;
+  registro?: string | null;
   setor: string | null;
   usuario: { email: string; role: Role; ativo: boolean };
 }
@@ -52,6 +55,8 @@ export default function ColaboradoresPage() {
   const [lista, setLista] = useState<Colaborador[] | null>(null);
   const [open, setOpen] = useState(false);
   const [senhaTemp, setSenhaTemp] = useState<string | null>(null);
+  const [editando, setEditando] = useState<Colaborador | null>(null);
+  const [editForm, setEditForm] = useState({ nome: '', telefone: '', registro: '', ativo: true });
 
   const {
     register,
@@ -68,6 +73,27 @@ export default function ColaboradoresPage() {
   useEffect(() => {
     carregar().catch(() => setLista([]));
   }, []);
+
+  function abrirEdicao(c: Colaborador) {
+    setEditForm({ nome: c.nome, telefone: c.telefone ?? '', registro: c.registro ?? '', ativo: c.usuario.ativo });
+    setEditando(c);
+  }
+  async function salvarEdicao() {
+    if (!editando) return;
+    try {
+      await api.patch(`/colaboradores/${editando.id}`, editForm);
+      toast.success('Colaborador atualizado');
+      setEditando(null);
+      carregar();
+    } catch (e) {
+      toast.error(apiErrorMessage(e));
+    }
+  }
+  async function remover(id: string) {
+    await api.delete(`/colaboradores/${id}`);
+    toast.success('Colaborador removido');
+    carregar();
+  }
 
   async function onSubmit(data: FormData) {
     try {
@@ -200,6 +226,7 @@ export default function ColaboradoresPage() {
                 <TableHead>Perfil</TableHead>
                 <TableHead className="hidden md:table-cell">Setor</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -214,12 +241,60 @@ export default function ColaboradoresPage() {
                       {c.usuario.ativo ? 'Ativo' : 'Inativo'}
                     </Badge>
                   </TableCell>
+                  <TableCell>
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => abrirEdicao(c)} aria-label="Editar">
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <ConfirmDelete
+                        onConfirm={() => remover(c.id)}
+                        descricao={`Remover ${c.nome}? O acesso será desativado e a conta apagada.`}
+                      />
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
       )}
+
+      {/* Diálogo de edição */}
+      <Dialog open={!!editando} onOpenChange={(o) => !o && setEditando(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar colaborador</DialogTitle>
+            <DialogDescription>{editando?.usuario.email}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="ed-nome">Nome</Label>
+              <Input id="ed-nome" value={editForm.nome} onChange={(e) => setEditForm((f) => ({ ...f, nome: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="ed-tel">Telefone</Label>
+                <Input id="ed-tel" value={editForm.telefone} onChange={(e) => setEditForm((f) => ({ ...f, telefone: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ed-reg">Registro</Label>
+                <Input id="ed-reg" value={editForm.registro} onChange={(e) => setEditForm((f) => ({ ...f, registro: e.target.value }))} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={editForm.ativo ? 'sim' : 'nao'} onValueChange={(v) => setEditForm((f) => ({ ...f, ativo: v === 'sim' }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sim">Ativo</SelectItem>
+                  <SelectItem value="nao">Inativo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button className="w-full" onClick={salvarEdicao}>Salvar alterações</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

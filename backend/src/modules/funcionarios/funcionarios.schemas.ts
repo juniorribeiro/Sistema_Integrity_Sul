@@ -15,4 +15,12 @@ export const autocadastroSchema = z.object({
   aceiteLGPD: z.literal(true, { errorMap: () => ({ message: 'É necessário aceitar os termos LGPD' }) }),
 });
 
+export const atualizarFuncionarioSchema = z.object({
+  nome: z.string().min(2).optional(),
+  cargo: z.string().min(2).optional(),
+  telefone: z.string().min(8).optional(),
+  ativo: z.boolean().optional(),
+});
+
 export type AutocadastroInput = z.infer<typeof autocadastroSchema>;
+export type AtualizarFuncionarioInput = z.infer<typeof atualizarFuncionarioSchema>;

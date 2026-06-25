@@ -116,6 +116,17 @@ export function createAgendamentosService(app: FastifyInstance) {
     return app.prisma.agendamento.update({ where: { id }, data: { status: input.status } });
   }
 
+  async function remover(id: string, usuarioId: string, role: string) {
+    const ag = await app.prisma.agendamento.findUnique({ where: { id } });
+    if (!ag) throw new AppError(404, 'Agendamento não encontrado');
+    if (role !== 'DIRETORIA') {
+      const colab = await profissional(usuarioId);
+      if (ag.profissionalId !== colab.id) throw new AppError(403, 'Acesso negado');
+    }
+    await app.prisma.agendamento.delete({ where: { id } });
+    return { ok: true };
+  }
+
   /** Funcionários disponíveis para agendar (seletor do formulário do profissional). */
   async function listarFuncionarios() {
     const funcs = await app.prisma.funcionario.findMany({
@@ -125,5 +136,5 @@ export function createAgendamentosService(app: FastifyInstance) {
     return funcs.map((f) => ({ id: f.id, nome: f.nome, cargo: f.cargo, empresa: f.empresa.razaoSocial }));
   }
 
-  return { criar, listar, atualizarStatus, listarFuncionarios };
+  return { criar, listar, atualizarStatus, remover, listarFuncionarios };
 }

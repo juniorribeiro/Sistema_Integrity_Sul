@@ -5,14 +5,16 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Plus, Copy, Check, Building2 } from 'lucide-react';
+import { Plus, Copy, Check, Building2, Pencil } from 'lucide-react';
 
 import { api, apiErrorMessage } from '@/lib/api';
 import { PageHeader } from '@/components/layouts/page-header';
+import { ConfirmDelete } from '@/components/shared/confirm-delete';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -57,6 +59,8 @@ export default function ClientesPage() {
   const [open, setOpen] = useState(false);
   const [resultado, setResultado] = useState<ResultadoCadastro | null>(null);
   const [copiado, setCopiado] = useState(false);
+  const [editando, setEditando] = useState<Empresa | null>(null);
+  const [editForm, setEditForm] = useState({ razaoSocial: '', setor: '', limiteFunc: '', ativa: true });
 
   const {
     register,
@@ -72,6 +76,32 @@ export default function ClientesPage() {
   useEffect(() => {
     carregar().catch(() => setEmpresas([]));
   }, []);
+
+  function abrirEdicao(e: Empresa) {
+    setEditForm({ razaoSocial: e.razaoSocial, setor: e.setor, limiteFunc: String(e.limiteFunc), ativa: e.ativa });
+    setEditando(e);
+  }
+  async function salvarEdicao() {
+    if (!editando) return;
+    try {
+      await api.patch(`/empresas/${editando.id}`, {
+        razaoSocial: editForm.razaoSocial,
+        setor: editForm.setor,
+        limiteFunc: Number(editForm.limiteFunc),
+        ativa: editForm.ativa,
+      });
+      toast.success('Empresa atualizada');
+      setEditando(null);
+      carregar();
+    } catch (e) {
+      toast.error(apiErrorMessage(e));
+    }
+  }
+  async function remover(id: string) {
+    await api.delete(`/empresas/${id}`);
+    toast.success('Empresa removida');
+    carregar();
+  }
 
   async function onSubmit(data: FormData) {
     try {
@@ -195,6 +225,7 @@ export default function ClientesPage() {
                 <TableHead className="hidden md:table-cell">Setor</TableHead>
                 <TableHead>Funcionários</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -209,12 +240,59 @@ export default function ClientesPage() {
                   <TableCell>
                     <Badge variant={e.ativa ? 'default' : 'secondary'}>{e.ativa ? 'Ativa' : 'Inativa'}</Badge>
                   </TableCell>
+                  <TableCell>
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => abrirEdicao(e)} aria-label="Editar">
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <ConfirmDelete
+                        onConfirm={() => remover(e.id)}
+                        descricao={`Remover ${e.razaoSocial}? Funcionários, RH e dados vinculados serão apagados.`}
+                      />
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
       )}
+
+      <Dialog open={!!editando} onOpenChange={(o) => !o && setEditando(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar empresa</DialogTitle>
+            <DialogDescription>{editando?.cnpj}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="ed-razao">Razão social</Label>
+              <Input id="ed-razao" value={editForm.razaoSocial} onChange={(ev) => setEditForm((f) => ({ ...f, razaoSocial: ev.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="ed-setor">Setor</Label>
+                <Input id="ed-setor" value={editForm.setor} onChange={(ev) => setEditForm((f) => ({ ...f, setor: ev.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ed-limite">Limite func.</Label>
+                <Input id="ed-limite" type="number" value={editForm.limiteFunc} onChange={(ev) => setEditForm((f) => ({ ...f, limiteFunc: ev.target.value }))} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={editForm.ativa ? 'sim' : 'nao'} onValueChange={(v) => setEditForm((f) => ({ ...f, ativa: v === 'sim' }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sim">Ativa</SelectItem>
+                  <SelectItem value="nao">Inativa</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button className="w-full" onClick={salvarEdicao}>Salvar alterações</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

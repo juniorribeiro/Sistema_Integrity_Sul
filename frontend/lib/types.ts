@@ -37,7 +37,7 @@ export const PORTAL_POR_ROLE: Record<Role, 'integrity' | 'cliente' | 'funcionari
 
 /** Rota inicial de cada portal após o login. */
 export const ROTA_INICIAL: Record<'integrity' | 'cliente' | 'funcionario', string> = {
-  integrity: '/dashboard',
-  cliente: '/dashboard',
-  funcionario: '/triagem',
+  integrity: '/integrity/dashboard',
+  cliente: '/cliente/dashboard',
+  funcionario: '/funcionario/triagem',
 };

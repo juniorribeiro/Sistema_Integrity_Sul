@@ -9,7 +9,12 @@ import prismaPlugin from './plugins/prisma.js';
 import redisPlugin from './plugins/redis.js';
 import garagePlugin from './plugins/garage.js';
 import authPlugin from './plugins/auth.js';
+import { registerErrorHandler } from './shared/errors.js';
 import authRoutes from './modules/auth/auth.routes.js';
+import colaboradoresRoutes from './modules/colaboradores/colaboradores.routes.js';
+import empresasRoutes from './modules/empresas/empresas.routes.js';
+import funcionariosRoutes from './modules/funcionarios/funcionarios.routes.js';
+import triagemRoutes from './modules/triagem/triagem.routes.js';
 
 async function build() {
   const app = Fastify({
@@ -48,11 +53,18 @@ async function build() {
   await app.register(garagePlugin);
   await app.register(authPlugin);
 
+  // Handler global de erros (AppError, Zod, Prisma)
+  registerErrorHandler(app);
+
   // Healthcheck
   app.get('/health', async () => ({ status: 'ok', ts: new Date().toISOString() }));
 
   // Rotas dos módulos
   await app.register(authRoutes, { prefix: '/auth' });
+  await app.register(colaboradoresRoutes, { prefix: '/colaboradores' });
+  await app.register(empresasRoutes, { prefix: '/empresas' });
+  await app.register(funcionariosRoutes, { prefix: '/funcionarios' });
+  await app.register(triagemRoutes, { prefix: '/triagem' });
 
   return app;
 }

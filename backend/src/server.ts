@@ -16,6 +16,9 @@ import empresasRoutes from './modules/empresas/empresas.routes.js';
 import funcionariosRoutes from './modules/funcionarios/funcionarios.routes.js';
 import triagemRoutes from './modules/triagem/triagem.routes.js';
 import psicologiaRoutes from './modules/psicologia/psicologia.routes.js';
+import nutricaoRoutes from './modules/nutricao/nutricao.routes.js';
+import juridicoRoutes from './modules/juridico/juridico.routes.js';
+import financeiroAtendimentoRoutes from './modules/financeiro-atendimento/financeiro-atendimento.routes.js';
 
 async function build() {
   const app = Fastify({
@@ -67,6 +70,9 @@ async function build() {
   await app.register(funcionariosRoutes, { prefix: '/funcionarios' });
   await app.register(triagemRoutes, { prefix: '/triagem' });
   await app.register(psicologiaRoutes, { prefix: '/psicologia' });
+  await app.register(nutricaoRoutes, { prefix: '/nutricao' });
+  await app.register(juridicoRoutes, { prefix: '/juridico' });
+  await app.register(financeiroAtendimentoRoutes, { prefix: '/financeiro-atendimento' });
 
   return app;
 }

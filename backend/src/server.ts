@@ -20,6 +20,9 @@ import nutricaoRoutes from './modules/nutricao/nutricao.routes.js';
 import juridicoRoutes from './modules/juridico/juridico.routes.js';
 import financeiroAtendimentoRoutes from './modules/financeiro-atendimento/financeiro-atendimento.routes.js';
 import agendamentosRoutes from './modules/agendamentos/agendamentos.routes.js';
+import curriculosRoutes from './modules/curriculos/curriculos.routes.js';
+import financeiroIntegrityRoutes from './modules/financeiro-integrity/financeiro-integrity.routes.js';
+import metricasRoutes from './modules/metricas/metricas.routes.js';
 
 async function build() {
   const app = Fastify({
@@ -75,6 +78,9 @@ async function build() {
   await app.register(juridicoRoutes, { prefix: '/juridico' });
   await app.register(financeiroAtendimentoRoutes, { prefix: '/financeiro-atendimento' });
   await app.register(agendamentosRoutes, { prefix: '/agendamentos' });
+  await app.register(curriculosRoutes, { prefix: '/curriculos' });
+  await app.register(financeiroIntegrityRoutes, { prefix: '/financeiro-integrity' });
+  await app.register(metricasRoutes, { prefix: '/metricas' });
 
   return app;
 }

@@ -29,6 +29,10 @@ services:
       - WHATSAPP_PHONE_ID=${WHATSAPP_PHONE_ID}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - LIVEKIT_URL=${LIVEKIT_URL}
+      - NEXT_PUBLIC_LIVEKIT_URL=${NEXT_PUBLIC_LIVEKIT_URL}
     depends_on:
       postgres:
         condition: service_healthy
@@ -116,6 +120,19 @@ services:
     depends_on:
       - frontend
       - backend
+    networks:
+      - integrity_net
+
+  livekit:
+    image: livekit/livekit-server:v1.6
+    container_name: integrity_livekit
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml
+    volumes:
+      - ./livekit/livekit.yaml:/etc/livekit.yaml
+    ports:
+      - "7880:7880"
+      - "7882:7882/udp"
     networks:
       - integrity_net
 

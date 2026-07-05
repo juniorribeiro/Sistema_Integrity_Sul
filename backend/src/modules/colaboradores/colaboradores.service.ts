@@ -5,12 +5,16 @@ import { enviarEmail } from '../../shared/email.js';
 import { SETOR_POR_ROLE, type CriarColaboradorInput, type AtualizarColaboradorInput } from './colaboradores.schemas.js';
 
 export function createColaboradoresService(app: FastifyInstance) {
-  async function criar(input: CriarColaboradorInput) {
+  async function criar(input: CriarColaboradorInput, roleRequisitante?: string) {
+    if (roleRequisitante === 'SUPORTE' && input.role === 'DIRETORIA') {
+      throw new AppError(403, 'Acesso negado: suporte não pode criar diretores');
+    }
+
     const email = input.email.toLowerCase();
     const cpf = soDigitos(input.cpf);
 
-    const senhaTemp = gerarSenhaTemporaria();
-    const senhaHash = await hashSenha(senhaTemp);
+    const senha = input.senha || gerarSenhaTemporaria();
+    const senhaHash = await hashSenha(senha);
     const setor = SETOR_POR_ROLE[input.role] ?? null;
 
     const usuario = await app.prisma.usuario.create({
@@ -36,7 +40,7 @@ export function createColaboradoresService(app: FastifyInstance) {
       to: email,
       subject: 'Seu acesso à Integrity Sul',
       html: `<p>Olá ${input.nome}, sua conta foi criada.</p>
-             <p>E-mail: <strong>${email}</strong><br/>Senha temporária: <strong>${senhaTemp}</strong></p>
+             <p>E-mail: <strong>${email}</strong><br/>Senha de acesso: <strong>${senha}</strong></p>
              <p>Você deverá trocar a senha no primeiro acesso.</p>`,
     });
 
@@ -47,45 +51,68 @@ export function createColaboradoresService(app: FastifyInstance) {
       email: usuario.email,
       role: usuario.role,
       setor,
-      senhaTemporaria: senhaTemp, // retornada para a Diretoria repassar
+      senhaTemporaria: senha, // retornada para a Diretoria/Suporte repassar
     };
   }
 
-  async function listar() {
+  async function listar(roleRequisitante?: string) {
+    const where = roleRequisitante === 'SUPORTE' ? { usuario: { role: { not: 'DIRETORIA' as const } } } : undefined;
     return app.prisma.colaborador.findMany({
+      where,
       orderBy: { criadoEm: 'desc' },
       include: { usuario: { select: { email: true, role: true, ativo: true } } },
     });
   }
 
-  async function obter(id: string) {
+  async function obter(id: string, roleRequisitante?: string) {
     const c = await app.prisma.colaborador.findUnique({
       where: { id },
       include: { usuario: { select: { email: true, role: true, ativo: true } } },
     });
     if (!c) throw new AppError(404, 'Colaborador não encontrado');
+    if (roleRequisitante === 'SUPORTE' && c.usuario.role === 'DIRETORIA') {
+      throw new AppError(403, 'Acesso negado');
+    }
     return c;
   }
 
-  async function atualizar(id: string, input: AtualizarColaboradorInput) {
-    const c = await app.prisma.colaborador.findUnique({ where: { id } });
+  async function atualizar(id: string, input: AtualizarColaboradorInput, roleRequisitante?: string) {
+    const c = await app.prisma.colaborador.findUnique({
+      where: { id },
+      include: { usuario: { select: { role: true } } },
+    });
     if (!c) throw new AppError(404, 'Colaborador não encontrado');
+    if (roleRequisitante === 'SUPORTE' && c.usuario.role === 'DIRETORIA') {
+      throw new AppError(403, 'Acesso negado');
+    }
 
-    const { ativo, ...dadosColab } = input;
+    const { ativo, senha, ...dadosColab } = input;
+    const updateUsuario: any = {};
+    if (ativo !== undefined) updateUsuario.ativo = ativo;
+    if (senha !== undefined) {
+      updateUsuario.senhaHash = await hashSenha(senha);
+    }
+
     return app.prisma.colaborador.update({
       where: { id },
       data: {
         ...dadosColab,
-        ...(ativo !== undefined ? { usuario: { update: { ativo } } } : {}),
+        ...(Object.keys(updateUsuario).length > 0 ? { usuario: { update: updateUsuario } } : {}),
       },
       include: { usuario: { select: { email: true, role: true, ativo: true } } },
     });
   }
 
   /** Remove o colaborador. Bloqueia (409) se houver atendimentos vinculados — nesse caso, desative pela edição. */
-  async function remover(id: string) {
-    const c = await app.prisma.colaborador.findUnique({ where: { id } });
+  async function remover(id: string, roleRequisitante?: string) {
+    const c = await app.prisma.colaborador.findUnique({
+      where: { id },
+      include: { usuario: { select: { role: true } } },
+    });
     if (!c) throw new AppError(404, 'Colaborador não encontrado');
+    if (roleRequisitante === 'SUPORTE' && c.usuario.role === 'DIRETORIA') {
+      throw new AppError(403, 'Acesso negado');
+    }
     try {
       await app.prisma.usuario.delete({ where: { id: c.usuarioId } }); // cascateia o colaborador
     } catch (e) {

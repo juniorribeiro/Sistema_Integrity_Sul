@@ -105,5 +105,34 @@ export function createAuthService(app: FastifyInstance) {
     return safe;
   }
 
-  return { login, refresh, logout, trocarSenha, me };
+  async function resetarSenhaOutroUsuario(
+    requerenteId: string,
+    requerenteRole: string,
+    targetEmail: string,
+    novaSenha: string
+  ) {
+    const targetUser = await app.prisma.usuario.findUnique({
+      where: { email: targetEmail.toLowerCase() }
+    });
+
+    if (!targetUser) {
+      throw new AuthError(404, 'Usuário não encontrado');
+    }
+
+    if (requerenteRole === 'SUPORTE' && targetUser.role === 'DIRETORIA') {
+      throw new AuthError(403, 'Acesso negado: suporte não pode resetar senha da diretoria');
+    }
+
+    const senhaHash = await bcrypt.hash(novaSenha, 10);
+
+    await app.prisma.usuario.update({
+      where: { id: targetUser.id },
+      data: {
+        senhaHash,
+        primeiroLogin: true, // força alteração no primeiro acesso
+      }
+    });
+  }
+
+  return { login, refresh, logout, trocarSenha, me, resetarSenhaOutroUsuario };
 }

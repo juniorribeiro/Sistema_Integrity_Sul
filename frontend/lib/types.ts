@@ -7,7 +7,8 @@ export type Role =
   | 'FINANCEIRO_ATENDIMENTO'
   | 'FINANCEIRO_INTEGRITY'
   | 'RH_CLIENTE'
-  | 'FUNCIONARIO';
+  | 'FUNCIONARIO'
+  | 'SUPORTE';
 
 export interface UsuarioResumo {
   id: string;
@@ -33,6 +34,7 @@ export const PORTAL_POR_ROLE: Record<Role, 'integrity' | 'cliente' | 'funcionari
   FINANCEIRO_INTEGRITY: 'integrity',
   RH_CLIENTE: 'cliente',
   FUNCIONARIO: 'funcionario',
+  SUPORTE: 'integrity',
 };
 
 /** Rota inicial de cada portal após o login. */

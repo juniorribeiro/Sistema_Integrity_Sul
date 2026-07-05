@@ -5,7 +5,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Plus, Users, Pencil } from 'lucide-react';
+import { Plus, Users, Pencil, Key } from 'lucide-react';
 
 import { api, apiErrorMessage } from '@/lib/api';
 import { ROLE_LABEL } from '@/lib/nav';
@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuthStore } from '@/lib/auth-store';
 
 const ROLES_INTERNOS: Role[] = [
   'DIRETORIA',
@@ -29,7 +30,9 @@ const ROLES_INTERNOS: Role[] = [
   'JURIDICO',
   'FINANCEIRO_ATENDIMENTO',
   'FINANCEIRO_INTEGRITY',
+  'SUPORTE',
 ];
+
 
 interface Colaborador {
   id: string;
@@ -48,15 +51,23 @@ const schema = z.object({
   telefone: z.string().optional(),
   registro: z.string().optional(),
   role: z.enum(ROLES_INTERNOS as [Role, ...Role[]]),
+  senha: z.string().optional(),
 });
 type FormData = z.input<typeof schema>;
 
 export default function ColaboradoresPage() {
+  const { usuario } = useAuthStore();
   const [lista, setLista] = useState<Colaborador[] | null>(null);
   const [open, setOpen] = useState(false);
   const [senhaTemp, setSenhaTemp] = useState<string | null>(null);
   const [editando, setEditando] = useState<Colaborador | null>(null);
-  const [editForm, setEditForm] = useState({ nome: '', telefone: '', registro: '', ativo: true });
+  const [editForm, setEditForm] = useState({ nome: '', telefone: '', registro: '', ativo: true, senha: '' });
+
+  // Reset senha dialog states
+  const [resetSenhaOpen, setResetSenhaOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetSenha, setResetSenha] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
 
   const {
     register,
@@ -75,13 +86,26 @@ export default function ColaboradoresPage() {
   }, []);
 
   function abrirEdicao(c: Colaborador) {
-    setEditForm({ nome: c.nome, telefone: c.telefone ?? '', registro: c.registro ?? '', ativo: c.usuario.ativo });
+    setEditForm({ nome: c.nome, telefone: c.telefone ?? '', registro: c.registro ?? '', ativo: c.usuario.ativo, senha: '' });
     setEditando(c);
   }
   async function salvarEdicao() {
     if (!editando) return;
     try {
-      await api.patch(`/colaboradores/${editando.id}`, editForm);
+      const payload: any = {
+        nome: editForm.nome,
+        telefone: editForm.telefone,
+        registro: editForm.registro,
+        ativo: editForm.ativo,
+      };
+      if (editForm.senha.trim()) {
+        if (editForm.senha.trim().length < 6) {
+          toast.error('A nova senha deve ter no mínimo 6 caracteres');
+          return;
+        }
+        payload.senha = editForm.senha;
+      }
+      await api.patch(`/colaboradores/${editando.id}`, payload);
       toast.success('Colaborador atualizado');
       setEditando(null);
       carregar();
@@ -107,6 +131,26 @@ export default function ColaboradoresPage() {
     }
   }
 
+  async function handleResetSenha(ev: React.FormEvent) {
+    ev.preventDefault();
+    if (resetSenha.length < 6) {
+      toast.error('A nova senha deve ter no mínimo 6 caracteres');
+      return;
+    }
+    setResetLoading(true);
+    try {
+      await api.post('/auth/reset-senha', { email: resetEmail, novaSenha: resetSenha });
+      toast.success('Senha redefinida com sucesso!');
+      setResetEmail('');
+      setResetSenha('');
+      setResetSenhaOpen(false);
+    } catch (err) {
+      toast.error(apiErrorMessage(err));
+    } finally {
+      setResetLoading(false);
+    }
+  }
+
   function fechar() {
     setOpen(false);
     setSenhaTemp(null);
@@ -119,71 +163,109 @@ export default function ColaboradoresPage() {
         title="Colaboradores"
         description="Equipe interna da Integrity Sul"
         action={
-          <Dialog open={open} onOpenChange={(o) => (o ? setOpen(true) : fechar())}>
-            <DialogTrigger
-              render={
-                <Button>
-                  <Plus className="mr-1 h-4 w-4" /> Novo colaborador
-                </Button>
-              }
-            />
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-              {!senhaTemp ? (
-                <>
-                  <DialogHeader>
-                    <DialogTitle>Novo colaborador</DialogTitle>
-                    <DialogDescription>O setor de atendimento é definido automaticamente pelo perfil.</DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
-                    <div className="space-y-2">
-                      <Label htmlFor="nome">Nome completo</Label>
-                      <Input id="nome" {...register('nome')} />
-                      {errors.nome && <p className="text-sm text-destructive">{errors.nome.message}</p>}
-                    </div>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="flex items-center gap-2">
+            <Dialog open={resetSenhaOpen} onOpenChange={setResetSenhaOpen}>
+              <DialogTrigger
+                render={
+                  <Button variant="outline">
+                    <Key className="mr-1 h-4 w-4" /> Resetar senha
+                  </Button>
+                }
+              />
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Resetar Senha de Usuário</DialogTitle>
+                  <DialogDescription>
+                    Redefina a senha de qualquer usuário (colaborador, RH ou funcionário).
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleResetSenha} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="reset-email">E-mail do usuário</Label>
+                    <Input id="reset-email" type="email" required value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="reset-senha">Nova senha (mín. 6 caracteres)</Label>
+                    <Input id="reset-senha" type="password" required value={resetSenha} onChange={(e) => setResetSenha(e.target.value)} />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={resetLoading}>
+                    {resetLoading ? 'Redefinindo…' : 'Redefinir senha'}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={open} onOpenChange={(o) => (o ? setOpen(true) : fechar())}>
+              <DialogTrigger
+                render={
+                  <Button>
+                    <Plus className="mr-1 h-4 w-4" /> Novo colaborador
+                  </Button>
+                }
+              />
+              <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+                {!senhaTemp ? (
+                  <>
+                    <DialogHeader>
+                      <DialogTitle>Novo colaborador</DialogTitle>
+                      <DialogDescription>O setor de atendimento é definido automaticamente pelo perfil.</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
                       <div className="space-y-2">
-                        <Label htmlFor="email">E-mail</Label>
-                        <Input id="email" type="email" {...register('email')} />
-                        {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+                        <Label htmlFor="nome">Nome completo</Label>
+                        <Input id="nome" {...register('nome')} />
+                        {errors.nome && <p className="text-sm text-destructive">{errors.nome.message}</p>}
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="cpf">CPF</Label>
-                        <Input id="cpf" inputMode="numeric" {...register('cpf')} />
-                        {errors.cpf && <p className="text-sm text-destructive">{errors.cpf.message}</p>}
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="email">E-mail</Label>
+                          <Input id="email" type="email" {...register('email')} />
+                          {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="cpf">CPF</Label>
+                          <Input id="cpf" inputMode="numeric" {...register('cpf')} />
+                          {errors.cpf && <p className="text-sm text-destructive">{errors.cpf.message}</p>}
+                        </div>
                       </div>
-                    </div>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label>Perfil de acesso</Label>
-                        <Controller
-                          control={control}
-                          name="role"
-                          render={({ field }) => (
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecione…" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {ROLES_INTERNOS.map((r) => (
-                                  <SelectItem key={r} value={r}>
-                                    {ROLE_LABEL[r]}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          )}
-                        />
-                        {errors.role && <p className="text-sm text-destructive">Selecione um perfil</p>}
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>Perfil de acesso</Label>
+                          <Controller
+                            control={control}
+                            name="role"
+                            render={({ field }) => (
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione…" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {ROLES_INTERNOS.filter((r) => usuario?.role !== 'SUPORTE' || r !== 'DIRETORIA').map((r) => (
+                                    <SelectItem key={r} value={r}>
+                                      {ROLE_LABEL[r]}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
+                          />
+                          {errors.role && <p className="text-sm text-destructive">Selecione um perfil</p>}
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="registro">Registro (CRP/CRN/OAB…)</Label>
+                          <Input id="registro" {...register('registro')} />
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="registro">Registro (CRP/CRN/OAB…)</Label>
-                        <Input id="registro" {...register('registro')} />
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="telefone">Telefone</Label>
+                          <Input id="telefone" {...register('telefone')} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="senha">Senha inicial (Opcional)</Label>
+                          <Input id="senha" type="password" placeholder="Em branco gera automática" {...register('senha')} />
+                        </div>
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="telefone">Telefone</Label>
-                      <Input id="telefone" {...register('telefone')} />
-                    </div>
                     <Button type="submit" className="w-full" disabled={isSubmitting}>
                       {isSubmitting ? 'Cadastrando…' : 'Cadastrar'}
                     </Button>
@@ -206,8 +288,9 @@ export default function ColaboradoresPage() {
               )}
             </DialogContent>
           </Dialog>
-        }
-      />
+        </div>
+      }
+    />
 
       {lista === null ? (
         <Skeleton className="h-64" />
@@ -224,7 +307,6 @@ export default function ColaboradoresPage() {
                 <TableHead>Nome</TableHead>
                 <TableHead className="hidden sm:table-cell">E-mail</TableHead>
                 <TableHead>Perfil</TableHead>
-                <TableHead className="hidden md:table-cell">Setor</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -235,7 +317,6 @@ export default function ColaboradoresPage() {
                   <TableCell className="font-medium">{c.nome}</TableCell>
                   <TableCell className="hidden text-sm sm:table-cell">{c.usuario.email}</TableCell>
                   <TableCell>{ROLE_LABEL[c.usuario.role]}</TableCell>
-                  <TableCell className="hidden md:table-cell">{c.setor ?? '—'}</TableCell>
                   <TableCell>
                     <Badge variant={c.usuario.ativo ? 'default' : 'secondary'}>
                       {c.usuario.ativo ? 'Ativo' : 'Inativo'}
@@ -287,9 +368,13 @@ export default function ColaboradoresPage() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="sim">Ativo</SelectItem>
-                  <SelectItem value="nao">Inativo</SelectItem>
+                  <SelectItem value="nao">Inativa</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ed-senha">Nova senha (mín. 6 caracteres)</Label>
+              <Input id="ed-senha" type="password" value={editForm.senha} onChange={(e) => setEditForm((f) => ({ ...f, senha: e.target.value }))} placeholder="Deixe em branco para manter a atual" />
             </div>
             <Button className="w-full" onClick={salvarEdicao}>Salvar alterações</Button>
           </div>

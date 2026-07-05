@@ -30,6 +30,7 @@ export const NAV_INTEGRITY: NavItem[] = [
   { label: 'Currículos', href: '/integrity/curriculos', icon: FileText },
   { label: 'Financeiro', href: '/integrity/financeiro', icon: Wallet },
   { label: 'Métricas', href: '/integrity/metricas', icon: BarChart3 },
+  { label: 'Calendário', href: '/integrity/calendario', icon: CalendarDays },
 ];
 
 export const NAV_CLIENTE: NavItem[] = [
@@ -72,9 +73,17 @@ const ATENDIMENTO_POR_ROLE: Partial<Record<Role, NavItem>> = {
   FINANCEIRO_ATENDIMENTO: { label: 'Atendimentos', href: '/integrity/financeiro-atendimento', icon: PiggyBank },
 };
 
+const NAV_SUPORTE: NavItem[] = [
+  { label: 'Dashboard', href: '/integrity/dashboard', icon: LayoutDashboard },
+  { label: 'Clientes', href: '/integrity/clientes', icon: Building2 },
+  { label: 'Colaboradores', href: '/integrity/colaboradores', icon: Users },
+  { label: 'Calendário', href: '/integrity/calendario', icon: CalendarDays },
+];
+
 /** Navegação do portal Integrity conforme o perfil do usuário. */
 export function navIntegrityParaRole(role: Role): NavItem[] {
   if (role === 'DIRETORIA') return NAV_INTEGRITY;
+  if (role === 'SUPORTE') return NAV_SUPORTE;
   if (role === 'CONSULTOR_RH') return NAV_CONSULTOR;
   if (role === 'FINANCEIRO_INTEGRITY')
     return [
@@ -97,4 +106,5 @@ export const ROLE_LABEL: Record<Role, string> = {
   FINANCEIRO_INTEGRITY: 'Financeiro (Interno)',
   RH_CLIENTE: 'RH',
   FUNCIONARIO: 'Funcionário',
+  SUPORTE: 'Suporte',
 };

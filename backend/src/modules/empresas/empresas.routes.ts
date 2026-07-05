@@ -3,7 +3,7 @@ import { validate } from '../../shared/errors.js';
 import { createEmpresasService } from './empresas.service.js';
 import { criarEmpresaSchema, atualizarEmpresaSchema } from './empresas.schemas.js';
 
-const GESTAO = ['DIRETORIA', 'CONSULTOR_RH'] as const;
+const GESTAO = ['DIRETORIA', 'CONSULTOR_RH', 'SUPORTE'] as const;
 
 export default async function empresasRoutes(app: FastifyInstance) {
   const service = createEmpresasService(app);

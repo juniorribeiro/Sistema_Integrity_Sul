@@ -25,7 +25,7 @@ export function createEmpresasService(app: FastifyInstance) {
     const expiresAt = new Date(Date.now() + validadeDias * 24 * 60 * 60 * 1000);
     const responsavelEmail = input.responsavelEmail.toLowerCase();
 
-    const senhaTempRH = gerarSenhaTemporaria();
+    const senhaTempRH = input.responsavelSenha || gerarSenhaTemporaria();
     const senhaHashRH = await hashSenha(senhaTempRH);
 
     // Cria empresa + conta do RH responsável em uma transação

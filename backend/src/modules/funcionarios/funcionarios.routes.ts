@@ -17,10 +17,10 @@ export default async function funcionariosRoutes(app: FastifyInstance) {
     return reply.code(201).send(result);
   });
 
-  // Listar — DIRETORIA/CONSULTOR veem todos; RH_CLIENTE vê só a sua empresa
+  // Listar — DIRETORIA/CONSULTOR/SUPORTE veem todos; RH_CLIENTE vê só a sua empresa
   app.get(
     '/',
-    { preHandler: app.authorize(['DIRETORIA', 'CONSULTOR_RH', 'RH_CLIENTE']) },
+    { preHandler: app.authorize(['DIRETORIA', 'CONSULTOR_RH', 'RH_CLIENTE', 'SUPORTE']) },
     async (req) => {
       if (req.user.role === 'RH_CLIENTE') {
         const empresaId = await service.empresaIdDoRH(req.user.sub);
@@ -32,7 +32,7 @@ export default async function funcionariosRoutes(app: FastifyInstance) {
 
   app.get(
     '/:id',
-    { preHandler: app.authorize(['DIRETORIA', 'CONSULTOR_RH', 'RH_CLIENTE']) },
+    { preHandler: app.authorize(['DIRETORIA', 'CONSULTOR_RH', 'RH_CLIENTE', 'SUPORTE']) },
     async (req) => {
       const { id } = req.params as { id: string };
       const restricao =
@@ -41,7 +41,7 @@ export default async function funcionariosRoutes(app: FastifyInstance) {
     },
   );
 
-  const GESTAO = ['DIRETORIA', 'CONSULTOR_RH', 'RH_CLIENTE'] as const;
+  const GESTAO = ['DIRETORIA', 'CONSULTOR_RH', 'RH_CLIENTE', 'SUPORTE'] as const;
 
   app.patch('/:id', { preHandler: app.authorize([...GESTAO]) }, async (req) => {
     const { id } = req.params as { id: string };

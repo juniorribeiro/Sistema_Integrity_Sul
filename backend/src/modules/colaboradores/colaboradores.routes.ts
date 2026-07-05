@@ -6,31 +6,31 @@ import { criarColaboradorSchema, atualizarColaboradorSchema } from './colaborado
 export default async function colaboradoresRoutes(app: FastifyInstance) {
   const service = createColaboradoresService(app);
 
-  // Criar — apenas DIRETORIA
-  app.post('/', { preHandler: app.authorize(['DIRETORIA']) }, async (req, reply) => {
+  // Criar — apenas DIRETORIA e SUPORTE (com restrições)
+  app.post('/', { preHandler: app.authorize(['DIRETORIA', 'SUPORTE']) }, async (req, reply) => {
     const input = validate(criarColaboradorSchema, req.body);
-    const result = await service.criar(input);
+    const result = await service.criar(input, req.user.role);
     return reply.code(201).send(result);
   });
 
-  // Listar — DIRETORIA e CONSULTOR_RH
-  app.get('/', { preHandler: app.authorize(['DIRETORIA', 'CONSULTOR_RH']) }, async () => {
-    return service.listar();
+  // Listar — DIRETORIA, CONSULTOR_RH e SUPORTE
+  app.get('/', { preHandler: app.authorize(['DIRETORIA', 'CONSULTOR_RH', 'SUPORTE']) }, async (req) => {
+    return service.listar(req.user.role);
   });
 
-  app.get('/:id', { preHandler: app.authorize(['DIRETORIA', 'CONSULTOR_RH']) }, async (req) => {
+  app.get('/:id', { preHandler: app.authorize(['DIRETORIA', 'CONSULTOR_RH', 'SUPORTE']) }, async (req) => {
     const { id } = req.params as { id: string };
-    return service.obter(id);
+    return service.obter(id, req.user.role);
   });
 
-  app.patch('/:id', { preHandler: app.authorize(['DIRETORIA']) }, async (req) => {
+  app.patch('/:id', { preHandler: app.authorize(['DIRETORIA', 'SUPORTE']) }, async (req) => {
     const { id } = req.params as { id: string };
     const input = validate(atualizarColaboradorSchema, req.body);
-    return service.atualizar(id, input);
+    return service.atualizar(id, input, req.user.role);
   });
 
-  app.delete('/:id', { preHandler: app.authorize(['DIRETORIA']) }, async (req) => {
+  app.delete('/:id', { preHandler: app.authorize(['DIRETORIA', 'SUPORTE']) }, async (req) => {
     const { id } = req.params as { id: string };
-    return service.remover(id);
+    return service.remover(id, req.user.role);
   });
 }

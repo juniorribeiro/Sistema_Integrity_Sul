@@ -33,6 +33,7 @@ interface Empresa {
   setor: string;
   ativa: boolean;
   limiteFunc: number;
+  urlToken: string;
   _count?: { funcionarios: number };
 }
 
@@ -42,6 +43,7 @@ const schema = z.object({
   setor: z.string().min(2, 'Informe o setor'),
   responsavelNome: z.string().min(2, 'Informe o responsável'),
   responsavelEmail: z.string().email('E-mail inválido'),
+  responsavelSenha: z.string().optional(),
   limiteFunc: z.preprocess(
     (v) => (v === '' || v == null ? undefined : v),
     z.coerce.number().int().positive().optional(),
@@ -59,8 +61,17 @@ export default function ClientesPage() {
   const [open, setOpen] = useState(false);
   const [resultado, setResultado] = useState<ResultadoCadastro | null>(null);
   const [copiado, setCopiado] = useState(false);
+  const [copiadoToken, setCopiadoToken] = useState<string | null>(null);
   const [editando, setEditando] = useState<Empresa | null>(null);
   const [editForm, setEditForm] = useState({ razaoSocial: '', setor: '', limiteFunc: '', ativa: true });
+
+  async function copiarUrlTabela(token: string) {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+    const url = `${origin}/cadastro/${token}`;
+    await navigator.clipboard.writeText(url);
+    setCopiadoToken(token);
+    setTimeout(() => setCopiadoToken(null), 2000);
+  }
 
   const {
     register,
@@ -175,6 +186,9 @@ export default function ClientesPage() {
                         <Input id="limiteFunc" type="number" placeholder="100" {...register('limiteFunc')} />
                       </Campo>
                     </div>
+                    <Campo id="responsavelSenha" label="Senha inicial do RH (Opcional)" error={errors.responsavelSenha?.message}>
+                      <Input id="responsavelSenha" type="password" placeholder="Em branco gera automática" {...register('responsavelSenha')} />
+                    </Campo>
                     <Button type="submit" className="w-full" disabled={isSubmitting}>
                       {isSubmitting ? 'Cadastrando…' : 'Cadastrar empresa'}
                     </Button>
@@ -224,6 +238,7 @@ export default function ClientesPage() {
                 <TableHead className="hidden sm:table-cell">CNPJ</TableHead>
                 <TableHead className="hidden md:table-cell">Setor</TableHead>
                 <TableHead>Funcionários</TableHead>
+                <TableHead>Link de Cadastro</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -236,6 +251,24 @@ export default function ClientesPage() {
                   <TableCell className="hidden md:table-cell">{e.setor}</TableCell>
                   <TableCell>
                     {e._count?.funcionarios ?? 0} / {e.limiteFunc}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => copiarUrlTabela(e.urlToken)}
+                    >
+                      {copiadoToken === e.urlToken ? (
+                        <>
+                          <Check className="h-3 w-3 text-green-600 mr-1" /> Copiado
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3 w-3 mr-1" /> Copiar link
+                        </>
+                      )}
+                    </Button>
                   </TableCell>
                   <TableCell>
                     <Badge variant={e.ativa ? 'default' : 'secondary'}>{e.ativa ? 'Ativa' : 'Inativa'}</Badge>
@@ -289,6 +322,26 @@ export default function ClientesPage() {
                 </SelectContent>
               </Select>
             </div>
+            {editando && (
+              <div className="space-y-2 pt-2 border-t border-border/40">
+                <Label>Link de cadastro de funcionários</Label>
+                <div className="flex gap-2">
+                  <Input readOnly value={`${typeof window !== 'undefined' ? window.location.origin : ''}/cadastro/${editando.urlToken}`} className="font-mono text-xs bg-muted" />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={async () => {
+                      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+                      await navigator.clipboard.writeText(`${origin}/cadastro/${editando.urlToken}`);
+                      toast.success('Link de cadastro copiado!');
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
             <Button className="w-full" onClick={salvarEdicao}>Salvar alterações</Button>
           </div>
         </DialogContent>

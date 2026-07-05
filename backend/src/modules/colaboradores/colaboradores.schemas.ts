@@ -9,6 +9,7 @@ export const ROLES_INTERNOS = [
   'JURIDICO',
   'FINANCEIRO_ATENDIMENTO',
   'FINANCEIRO_INTEGRITY',
+  'SUPORTE',
 ] as const;
 
 /** Setor de atendimento derivado do role (null para perfis sem atendimento). */
@@ -26,6 +27,7 @@ export const criarColaboradorSchema = z.object({
   telefone: z.string().optional(),
   registro: z.string().optional(),
   role: z.enum(ROLES_INTERNOS),
+  senha: z.string().min(6).optional(),
 });
 
 export const atualizarColaboradorSchema = z.object({
@@ -33,6 +35,7 @@ export const atualizarColaboradorSchema = z.object({
   telefone: z.string().optional(),
   registro: z.string().optional(),
   ativo: z.boolean().optional(),
+  senha: z.string().min(6).optional(),
 });
 
 export type CriarColaboradorInput = z.infer<typeof criarColaboradorSchema>;

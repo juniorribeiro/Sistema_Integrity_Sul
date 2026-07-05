@@ -26,6 +26,7 @@ enum Role {
   FINANCEIRO_INTEGRITY
   RH_CLIENTE
   FUNCIONARIO
+  SUPORTE
 }
 
 enum Setor {
@@ -123,6 +124,7 @@ model Colaborador {
   prontuariosJuridico   ProntuarioJuridico[]
   prontuariosFinanceiro ProntuarioFinanceiro[]
   agendamentos          Agendamento[]
+  disponibilidades      Disponibilidade[]
 }
 
 // RH da empresa cliente
@@ -499,8 +501,33 @@ model Agendamento {
   funcionario  Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
   profissional Colaborador @relation(fields: [profissionalId], references: [id])
 
+  disponibilidade Disponibilidade?
+
   @@index([profissionalId, dataHora])
   @@index([funcionarioId])
+}
+
+// Horário disponível (slot) que o profissional abre na agenda
+model Disponibilidade {
+  id             String     @id @default(cuid())
+  profissionalId String
+  setor          Setor
+  inicio         DateTime
+  fim            DateTime
+  status         StatusSlot @default(LIVRE)
+  agendamentoId  String?    @unique
+  criadoEm       DateTime   @default(now())
+
+  profissional Colaborador  @relation(fields: [profissionalId], references: [id], onDelete: Cascade)
+  agendamento  Agendamento? @relation(fields: [agendamentoId], references: [id], onDelete: SetNull)
+
+  @@index([setor, inicio])
+  @@index([profissionalId, inicio])
+}
+
+enum StatusSlot {
+  LIVRE
+  RESERVADO
 }
 
 // ============================================================

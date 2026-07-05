@@ -16,14 +16,12 @@ import type { Portal } from '@/lib/nav';
 export function PortalGuard({ portal, children }: { portal: Portal; children: React.ReactNode }) {
   const router = useRouter();
   const { accessToken, usuario } = useAuthStore();
-  const [hidratado, setHidratado] = useState(() => useAuthStore.persist.hasHydrated());
+  const [hidratado, setHidratado] = useState(false);
   const [pronto, setPronto] = useState(false);
 
-  // Aguarda a hidratação do storage persistido
+  // Aguarda a montagem no cliente (quando o storage persistido já estará hidratado)
   useEffect(() => {
-    if (useAuthStore.persist.hasHydrated()) setHidratado(true);
-    const unsub = useAuthStore.persist.onFinishHydration(() => setHidratado(true));
-    return unsub;
+    setHidratado(true);
   }, []);
 
   useEffect(() => {

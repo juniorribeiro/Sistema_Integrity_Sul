@@ -6,6 +6,7 @@ export const criarEmpresaSchema = z.object({
   setor: z.string().min(2),
   responsavelNome: z.string().min(2),
   responsavelEmail: z.string().email(),
+  responsavelSenha: z.string().min(6).optional(),
   limiteFunc: z.coerce.number().int().positive().optional(),
   /** Dias de validade da URL de cadastro (padrão 30). */
   validadeDias: z.coerce.number().int().positive().max(365).optional(),
